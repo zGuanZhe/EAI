@@ -1,0 +1,92 @@
+[
+  {
+    "id": "A",
+    "slug": "data-corpus",
+    "title": "A. Embodied AI Data Corpus Atlas",
+    "title_cn": "数据语料库"
+  },
+  {
+    "id": "B",
+    "slug": "benchmark-eval",
+    "title": "B. Embodied AI Benchmark Evaluation Atlas",
+    "title_cn": "基准评测"
+  },
+  {
+    "id": "C",
+    "slug": "simulation-synthetic",
+    "title": "C. Simulation / Synthetic Data Engine Atlas",
+    "title_cn": "仿真合成引擎"
+  },
+  {
+    "id": "D",
+    "slug": "representation-latent",
+    "title": "D. Embodied Representation / Latent State",
+    "title_cn": "具身表征与隐状态"
+  },
+  {
+    "id": "E",
+    "slug": "action-tokenization",
+    "title": "E. Action Representation / Tokenization Atlas",
+    "title_cn": "动作表示与Token化"
+  },
+  {
+    "id": "F",
+    "slug": "policy-learning",
+    "title": "F. Policy Learning / Generative Control",
+    "title_cn": "策略学习与生成控制"
+  },
+  {
+    "id": "G",
+    "slug": "vla-rfm",
+    "title": "G. VLA / RFM Research Atlas",
+    "title_cn": "VLA与机器人基础模型"
+  },
+  {
+    "id": "H",
+    "slug": "world-model",
+    "title": "H. World Model / Predictive Learning",
+    "title_cn": "世界模型与预测学习"
+  },
+  {
+    "id": "I",
+    "slug": "rl-posttraining",
+    "title": "I. RL Posttraining Research Atlas",
+    "title_cn": "强化学习后训练"
+  },
+  {
+    "id": "J",
+    "slug": "cross-embodiment",
+    "title": "J. Cross Embodiment Research Atlas",
+    "title_cn": "跨具身研究"
+  },
+  {
+    "id": "K",
+    "slug": "task-skill-curriculum",
+    "title": "K. Task / Skill Curriculum Atlas",
+    "title_cn": "任务与技能课程"
+  },
+  {
+    "id": "L",
+    "slug": "efficient-deployable",
+    "title": "L. Efficient Deployable Embodied Models Atlas",
+    "title_cn": "高效可部署模型"
+  },
+  {
+    "id": "M",
+    "slug": "safety-risk-deployment",
+    "title": "M. Embodied AI Safety / Risk / Deployment",
+    "title_cn": "安全风险与部署"
+  },
+  {
+    "id": "N",
+    "slug": "reasoning-planning-memory",
+    "title": "N. Reasoning / Planning / Memory Atlas",
+    "title_cn": "推理规划与记忆"
+  },
+  {
+    "id": "WAM",
+    "slug": "world-abstraction-model",
+    "title": "WAM Research Atlas",
+    "title_cn": "世界抽象模型"
+  }
+]

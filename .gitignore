@@ -1,0 +1,30 @@
+# Dependencies and build outputs
+node_modules/
+apps/web/dist/
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+apps/desktop/src-tauri/binaries/*.exe
+services/api/.venv/
+build/
+dist/
+artifacts/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Runtime and local verification
+runtime/
+logs/
+test-results/
+.playwright-browsers/
+
+# Personal migration snapshot is local-only
+migration/personal-snapshot/**
+!migration/personal-snapshot/.gitkeep
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem

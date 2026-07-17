@@ -1,0 +1,57 @@
+{
+  "id": "thread-legacy-fixture",
+  "title": "Synthetic legacy thread",
+  "goal": "Verify read-only compatibility",
+  "status": "active",
+  "created_at": "2026-01-01T00:00:00Z",
+  "updated_at": "2026-01-02T00:00:00Z",
+  "revision": 3,
+  "active_surface": "thread",
+  "active_atlas_id": "I",
+  "messages": [
+    {
+      "id": "message-legacy-user",
+      "role": "user",
+      "kind": "text",
+      "content": "Legacy question",
+      "status": "done",
+      "surface": "thread",
+      "created_at": "2026-01-01T00:00:00Z"
+    },
+    {
+      "id": "message-legacy-assistant",
+      "role": "assistant",
+      "kind": "assistant_reply",
+      "content": "Legacy answer",
+      "status": "done",
+      "surface": "thread",
+      "created_at": "2026-01-01T00:00:01Z"
+    }
+  ],
+  "agent_runs": [
+    {
+      "id": "agent-run-legacy-fixture",
+      "thread_id": "thread-legacy-fixture",
+      "status": "done",
+      "user_message_id": "message-legacy-user",
+      "assistant_message_id": "message-legacy-assistant",
+      "answer": "Legacy answer",
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:01Z"
+    }
+  ],
+  "changesets": [
+    {
+      "id": "changeset-legacy-fixture",
+      "thread_id": "thread-legacy-fixture",
+      "source_run_id": "agent-run-legacy-fixture",
+      "base_revision": 2,
+      "summary": "Synthetic historical change",
+      "status": "undone",
+      "operations": [],
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-02T00:00:00Z",
+      "undone_at": "2026-01-02T00:00:00Z"
+    }
+  ]
+}

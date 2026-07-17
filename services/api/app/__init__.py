@@ -1,0 +1,1 @@
+"""EAI vNext thin service."""

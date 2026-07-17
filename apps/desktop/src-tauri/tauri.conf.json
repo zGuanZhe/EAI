@@ -1,0 +1,43 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "EAI Desktop",
+  "version": "0.4.0",
+  "identifier": "com.eai.desktop",
+  "build": {
+    "frontendDist": "../../../apps/web/dist",
+    "devUrl": "http://127.0.0.1:5173"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "EAI Desktop",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 700,
+        "center": true,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost data:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://127.0.0.1:*; script-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "externalBin": ["binaries/eai-service"],
+    "resources": {
+      "../../../resources/atlas-cache/": "atlas-cache/",
+      "../../../migration/personal-snapshot/": "personal-snapshot/",
+      "../../../third_party/ai-scientist-v2/": "third_party/ai-scientist-v2/"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false
+      }
+    }
+  }
+}

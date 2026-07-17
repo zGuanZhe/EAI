@@ -1,0 +1,48 @@
+import { ChevronDown, RefreshCcw, Search, SlidersHorizontal } from "lucide-react";
+import { useState } from "react";
+
+export function AtlasToolbar({
+  query,
+  onQuery,
+  routes,
+  routeFilter,
+  onRouteFilter,
+  years,
+  yearFilter,
+  onYearFilter,
+  relationMode,
+  onRelationMode,
+  onOpenUpdate,
+  routeLabel
+}) {
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  return (
+    <section className="atlas-workbench-toolbar" aria-label="Atlas 工具栏">
+      <label className="atlas-search-field">
+        <Search size={14} />
+        <input value={query} onChange={(event) => onQuery(event.target.value)} placeholder="搜索论文、路线或判断" />
+      </label>
+      <div className="atlas-relation-modes" aria-label="关系显示模式">
+        {[{ id: "focus", label: "聚焦" }, { id: "all", label: "全部" }, { id: "hidden", label: "隐藏" }].map((mode) => (
+          <button key={mode.id} type="button" className={relationMode === mode.id ? "active" : ""} onClick={() => onRelationMode(mode.id)}>{mode.label}</button>
+        ))}
+      </div>
+      <div className="atlas-filter-menu">
+        <button className="atlas-filter-toggle" type="button" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((value) => !value)}>
+          <SlidersHorizontal size={14} />筛选<ChevronDown size={13} />
+        </button>
+        <div className={`atlas-filter-fields${filtersOpen ? " open" : ""}`}>
+          <select value={routeFilter} onChange={(event) => onRouteFilter(event.target.value)} aria-label="筛选路线">
+            <option value="all">全部路线</option>
+            {routes.map((route, index) => <option key={route.id} value={route.id}>{routeLabel(route, index)}</option>)}
+          </select>
+          <select value={yearFilter} onChange={(event) => onYearFilter(event.target.value)} aria-label="筛选年份">
+            <option value="all">全部年份</option>
+            {years.map((year) => <option key={year} value={year}>{year}</option>)}
+          </select>
+          <button className="atlas-update-entry" type="button" onClick={onOpenUpdate}><RefreshCcw size={14} />论文更新</button>
+        </div>
+      </div>
+    </section>
+  );
+}

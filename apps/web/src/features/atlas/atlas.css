@@ -1,0 +1,134 @@
+.atlas-surface {
+  grid-template-rows: auto auto 34px minmax(0, 1fr);
+}
+
+.atlas-workbench-toolbar {
+  grid-template-columns: minmax(220px, 1fr) auto auto;
+  overflow: visible;
+}
+
+.atlas-filter-menu {
+  position: relative;
+  min-width: 0;
+}
+
+.atlas-filter-toggle {
+  display: none;
+}
+
+.atlas-filter-fields {
+  display: grid;
+  grid-template-columns: 140px 112px auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.atlas-route-navigator {
+  z-index: 19;
+  display: grid;
+  grid-template-columns: 30px minmax(80px, 180px) auto 30px;
+  gap: 8px;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 14px;
+  border-bottom: 1px solid rgba(36, 43, 52, 0.07);
+  background: rgba(249, 251, 252, 0.96);
+  color: #6d7781;
+  font-size: 11px;
+}
+
+.atlas-route-navigator button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cyan);
+  cursor: pointer;
+}
+
+.atlas-route-navigator button:hover:not(:disabled) { background: var(--cyan-soft); }
+.atlas-route-navigator button:disabled { color: #b9c0c6; cursor: default; }
+
+.atlas-route-progress {
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(22, 137, 167, 0.12);
+}
+
+.atlas-route-progress span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--cyan);
+  transform-origin: left center;
+}
+
+.timeline-shell { grid-row: 4; scrollbar-color: rgba(22, 137, 167, 0.42) transparent; }
+.timeline-paper { border-radius: var(--radius-control); transition-duration: var(--motion-fast); transition-timing-function: var(--ease-product); }
+.paper-evidence-dot { position: absolute; top: 11px; right: 40px; width: 7px; height: 7px; border-radius: 999px; background: #aeb7c0; box-shadow: 0 0 0 3px color-mix(in srgb, #aeb7c0 12%, transparent); }
+.paper-evidence-dot.metadata { background: var(--cyan); box-shadow: 0 0 0 3px color-mix(in srgb, var(--cyan) 12%, transparent); }
+.paper-evidence-dot.claims { background: var(--violet); box-shadow: 0 0 0 3px color-mix(in srgb, var(--violet) 12%, transparent); }
+.paper-evidence-dot.full-text { background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 14%, transparent); }
+.timeline-edge, .relation-port { transition: opacity var(--motion-fast) var(--ease-product), stroke-width var(--motion-fast) var(--ease-product), stroke var(--motion-fast) var(--ease-product); }
+.timeline-shell::-webkit-scrollbar { width: 10px; height: 10px; }
+.timeline-shell::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 999px; background: rgba(22, 137, 167, 0.42); background-clip: padding-box; }
+
+.atlas-relation.locked .timeline-edge { stroke-width: 3px; opacity: 1; }
+
+@media (max-width: 899px) {
+  .atlas-overview-strip { min-height: 68px; }
+  .atlas-workbench-toolbar {
+    grid-template-columns: minmax(170px, 1fr) auto auto;
+    min-height: 52px;
+    padding: 7px 10px;
+  }
+  .atlas-filter-toggle {
+    display: inline-flex;
+    gap: 5px;
+    align-items: center;
+    justify-content: center;
+    min-height: 30px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--orange-soft);
+    color: var(--orange);
+    cursor: pointer;
+    font-size: 11px;
+  }
+  .atlas-filter-fields {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 40;
+    display: none;
+    width: min(340px, calc(100vw - var(--left-width) - 20px));
+    grid-template-columns: 1fr 110px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 10px 28px rgba(30, 38, 48, 0.12);
+  }
+  .atlas-filter-fields.open { display: grid; }
+  .atlas-filter-fields .atlas-update-entry { grid-column: 1 / -1; }
+  .atlas-workbench-toolbar select { display: block; width: 100%; }
+  .atlas-route-navigator { grid-template-columns: 28px minmax(60px, 1fr) auto 28px; padding: 0 8px; }
+}
+
+@media (max-width: 620px) {
+  .atlas-workbench-toolbar { grid-template-columns: minmax(150px, 1fr) auto; }
+  .atlas-filter-menu { grid-column: 2; grid-row: 1; }
+  .atlas-relation-modes { grid-column: 1 / -1; justify-self: start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atlas-route-progress span { transition: none; }
+  .timeline-paper, .timeline-edge, .relation-port { transition: none; }
+}

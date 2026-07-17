@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.exe binary
+*.bundle.json -diff
+third_party/ai-scientist-v2/** -whitespace

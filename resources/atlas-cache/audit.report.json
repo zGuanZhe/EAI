@@ -1,0 +1,3450 @@
+{
+  "generated_at": "2026-06-24T14:43:58.304Z",
+  "stats": {
+    "total_canonical_papers": 685,
+    "total_entries": 902,
+    "total_relations": 1556,
+    "duplicate_titles": 0,
+    "missing_canonical_paper_id": 241,
+    "missing_source_confidence": 112,
+    "broken_relations": 0,
+    "watchlist_entries": 3,
+    "unreviewed_relations": 0,
+    "cross_atlas_papers": 175,
+    "low_confidence_entries": 1,
+    "papers_without_source": 1
+  },
+  "findings": {
+    "duplicate_titles": [],
+    "missing_canonical_paper_id": [
+      {
+        "atlas_id": "A",
+        "paper_id": "bridging_language_and_action_survey_of_language_conditioned",
+        "title": "Bridging Language and Action: A Survey of Language-Conditioned Robot Manipulation"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "generalist_robot_learning_from_internet_video_survey",
+        "title": "Towards Generalist Robot Learning from Internet Video: A Survey"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "robot_learning_tutorial",
+        "title": "Robot Learning: A Tutorial"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "from_human_videos_to_robot_manipulation_survey_on",
+        "title": "From Human Videos to Robot Manipulation: A Survey on Scalable VLA Data"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "robot_learning_from_human_videos_survey",
+        "title": "Robot Learning from Human Videos: A Survey"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "vision_language_action_in_robotics_survey_of_datasets",
+        "title": "Vision-Language-Action in Robotics: A Survey of Datasets, Benchmarks, and Data Engines"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "qt_opt_scalable_deep_reinforcement_learning_for_vision",
+        "title": "QT-Opt: Scalable Deep Reinforcement Learning for Vision-Based Robotic Manipulation"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "robonet_large_scale_multi_robot_learning",
+        "title": "RoboNet: Large-Scale Multi-Robot Learning"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "bridgedata_v1",
+        "title": "BridgeData V1"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "robomimic_modular_framework_for_robot_learning_from_demonstration",
+        "title": "robomimic: A Modular Framework for Robot Learning from Demonstration"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "bc_z_zero_shot_task_generalization_with_robotic_2",
+        "title": "BC-Z: Zero-Shot Task Generalization with Robotic Imitation Learning"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "fractal_rt_1_dataset_fractal20220817_data",
+        "title": "Fractal / RT-1 Dataset (fractal20220817_data)"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "language_table_interactive_language_talking_to_robots_in",
+        "title": "Language-Table / Interactive Language: Talking to Robots in Real Time"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "rt_1_data_robotics_transformer_real_world_control",
+        "title": "RT-1 Data: Robotics Transformer Real-World Control Corpus"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "armbench_object_centric_benchmark_dataset_for_robotic_manipulation",
+        "title": "ARMBench: An Object-centric Benchmark Dataset for Robotic Manipulation"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "bridgedata_v2_dataset_for_robot_learning_at_scale",
+        "title": "BridgeData V2: A Dataset for Robot Learning at Scale"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "rh20t_comprehensive_robotic_dataset_for_learning_diverse_skills",
+        "title": "RH20T: A Comprehensive Robotic Dataset for Learning Diverse Skills in One-Shot"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "robo360_3d_omnispective_multi_material_robotic_manipulation_dataset",
+        "title": "Robo360: A 3D Omnispective Multi-Material Robotic Manipulation Dataset"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "roboset",
+        "title": "RoboSet"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "droid_large_scale_in_wild_robot_manipulation_dataset",
+        "title": "DROID: A Large-Scale In-The-Wild Robot Manipulation Dataset"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "rh20t_p_primitive_level_robotic_dataset",
+        "title": "RH20T-P: A Primitive-Level Robotic Dataset"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "kaiwu_multimodal_manipulation_dataset_and_framework",
+        "title": "Kaiwu: A Multimodal Manipulation Dataset and Framework"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "sharerobot_robobrain_dataset",
+        "title": "ShareRobot / RoboBrain Dataset"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "mime_multiple_interactions_made_easy",
+        "title": "MIME: Multiple Interactions Made Easy"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "roboturk_crowdsourcing_platform_for_robotic_skill_learning",
+        "title": "RoboTurk: A Crowdsourcing Platform for Robotic Skill Learning"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "learning_latent_plans_from_play",
+        "title": "Learning Latent Plans from Play"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "aloha_act_learning_fine_grained_bimanual_manipulation_with",
+        "title": "ALOHA / ACT: Learning Fine-Grained Bimanual Manipulation with Low-Cost Hardware"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "anyteleop_general_vision_based_dexterous_robot_arm_hand",
+        "title": "AnyTeleop: A General Vision-Based Dexterous Robot Arm-Hand Teleoperation System"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "aloha_2_enhanced_low_cost_hardware_for_bimanual",
+        "title": "ALOHA 2: Enhanced Low-Cost Hardware for Bimanual Teleoperation"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "dexhub_and_dart_internet_scale_robot_data_collection",
+        "title": "DexHub and DART: Towards Internet Scale Robot Data Collection"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "fastumi_scalable_and_hardware_independent_umi_with_dataset",
+        "title": "FastUMI: Scalable and Hardware-Independent UMI with Dataset"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "moma_teleop_whole_body_teleoperation_for_mobile_manipulation",
+        "title": "MoMa-Teleop: Whole-Body Teleoperation for Mobile Manipulation at Zero Added Cost"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "open_teach_versatile_teleoperation_system_for_robotic_manipulation",
+        "title": "OPEN TEACH: A Versatile Teleoperation System for Robotic Manipulation"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "open_television_teleoperation_with_immersive_active_visual_feedback",
+        "title": "Open-TeleVision: Teleoperation with Immersive Active Visual Feedback"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "universal_manipulation_interface_in_wild_robot_teaching_without",
+        "title": "Universal Manipulation Interface: In-The-Wild Robot Teaching Without In-The-Wild Robots"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "open_x_embodiment_robotic_learning_datasets_and_rt",
+        "title": "Open X-Embodiment: Robotic Learning Datasets and RT-X Models"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "rt_x_data_mixture",
+        "title": "RT-X Data Mixture"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "robomind_multi_embodiment_intelligence_normative_data_for_robot",
+        "title": "RoboMIND: Multi-embodiment Intelligence Normative Data for Robot Manipulation"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "agibot_world_colosseo_large_scale_manipulation_platform",
+        "title": "AgiBot World Colosseo: Large-scale Manipulation Platform"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "robomind_2_0_multimodal_bimanual_mobile_manipulation_dataset",
+        "title": "RoboMIND 2.0: Multimodal Bimanual Mobile Manipulation Dataset"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "epic_kitchens",
+        "title": "EPIC-KITCHENS"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "something_something_v2",
+        "title": "Something-Something V2"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "ego4d",
+        "title": "Ego4D"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "hoi4d_4d_egocentric_dataset_for_category_level_human",
+        "title": "HOI4D: A 4D Egocentric Dataset for Category-Level Human-Object Interaction"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "r3m_reusable_representations_for_robot_manipulation_from_human",
+        "title": "R3M: Reusable Representations for Robot Manipulation from Human Video"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "vip_value_implicit_pre_training_from_human_videos",
+        "title": "VIP: Value-Implicit Pre-Training from Human Videos"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "holoassist_egocentric_human_interaction_dataset",
+        "title": "HoloAssist: An Egocentric Human Interaction Dataset"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "egomimic_scaling_imitation_learning_via_egocentric_video",
+        "title": "EgoMimic: Scaling Imitation Learning via Egocentric Video"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "genie_latent_action_model_from_internet_videos",
+        "title": "Genie / Latent Action Model from Internet Videos"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "lapa_latent_action_pretraining_from_videos",
+        "title": "LAPA: Latent Action Pretraining from Videos"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "okami_teaching_humanoid_robots_manipulation_skills_through_single",
+        "title": "OKAMI: Teaching Humanoid Robots Manipulation Skills through Single Video Imitation"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "h2r_human_to_robot_data_augmentation_for_robot",
+        "title": "H2R: Human-to-Robot Data Augmentation for Robot Pre-training from Videos"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "vidbot_learning_generalizable_3d_actions_from_in_wild",
+        "title": "VidBot: Learning Generalizable 3D Actions from In-the-Wild 2D Human Videos"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "egolive_large_scale_egocentric_dataset_from_real_world",
+        "title": "EgoLive: Large-Scale Egocentric Dataset from Real-World Human Tasks"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "egoverse_egocentric_human_dataset_for_robot_learning_from",
+        "title": "EgoVerse: Egocentric Human Dataset for Robot Learning from Around the World"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "dexycb_capturing_hand_grasping_of_objects",
+        "title": "DexYCB: Capturing Hand Grasping of Objects"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "brmdata_bimanual_mobile_robot_manipulation_dataset_for_household",
+        "title": "BRMData: Bimanual-Mobile Robot Manipulation Dataset for Household Tasks"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "dexcap_scalable_and_portable_mocap_data_collection_system",
+        "title": "DexCap: Scalable and Portable Mocap Data Collection System for Dexterous Manipulation"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "humanplus_humanoid_shadowing_and_imitation_from_humans",
+        "title": "HumanPlus: Humanoid Shadowing and Imitation from Humans"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "mobile_aloha_learning_bimanual_mobile_manipulation_with_low",
+        "title": "Mobile ALOHA: Learning Bimanual Mobile Manipulation with Low-Cost Whole-Body Teleoperation"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "behavior_robot_suite_real_world_whole_body_manipulation",
+        "title": "BEHAVIOR Robot Suite: Real-World Whole-Body Manipulation"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "egomi_learning_active_vision_and_whole_body_manipulation",
+        "title": "EgoMI: Learning Active Vision and Whole-Body Manipulation from Egocentric Human Demonstrations"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "rlds_ecosystem_to_generate_share_and_use_datasets",
+        "title": "RLDS: An Ecosystem to Generate, Share and Use Datasets in Reinforcement Learning"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "tensorflow_datasets_robotics_entries_fractal_data",
+        "title": "TensorFlow Datasets Robotics Entries / Fractal Data"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "open_x_embodiment_canonicalization",
+        "title": "Open X-Embodiment Canonicalization"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "open_x_embodiment_repository_unified_rlds_format",
+        "title": "Open X-Embodiment Repository / Unified RLDS Format"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "lerobotdataset_format_hugging_face_hub",
+        "title": "LeRobotDataset Format / Hugging Face Hub"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "hugging_face_robot_datasets_ecosystem",
+        "title": "Hugging Face Robot Datasets Ecosystem"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "robo_dm_repository",
+        "title": "Robo-DM Repository"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "robo_dm_data_management_for_large_robot_datasets",
+        "title": "Robo-DM: Data Management for Large Robot Datasets"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "lerobot_open_source_library_for_end_to_end",
+        "title": "LeRobot: An Open-Source Library for End-to-End Robot Learning"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "hg_dagger_interactive_imitation_learning_with_human_experts",
+        "title": "HG-DAgger: Interactive Imitation Learning with Human Experts"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "multimodal_detection_and_identification_of_robot_manipulation_failures",
+        "title": "Multimodal Detection and Identification of Robot Manipulation Failures"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "aha_vlm_for_detecting_and_reasoning_over_failures",
+        "title": "AHA: A VLM for Detecting and Reasoning Over Failures in Robotic Manipulation"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "cupid_curating_data_your_robot_loves_with_influence",
+        "title": "CUPID: Curating Data your Robot Loves with Influence Functions"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "data_corl_2025_what_makes_robot_learning_data",
+        "title": "Data@CoRL 2025: What Makes Robot Learning Data Good?"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "robofac_robotic_failure_analysis_and_correction",
+        "title": "RoboFAC: Robotic Failure Analysis and Correction"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "robot_data_curation_with_mutual_information_estimators",
+        "title": "Robot Data Curation with Mutual Information Estimators"
+      },
+      {
+        "atlas_id": "A",
+        "paper_id": "egoverse_data_reprocessing_quality_updates",
+        "title": "EgoVerse Data Reprocessing / Quality Updates"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "ai2_thor",
+        "title": "AI2-THOR"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "embodiedqa",
+        "title": "EmbodiedQA"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "room_to_room_r2r",
+        "title": "Room-to-Room (R2R)"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "habitat_challenge_habitat_lab",
+        "title": "Habitat Challenge / Habitat-Lab"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "alfred",
+        "title": "ALFRED"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "room_across_room_rxr",
+        "title": "Room-Across-Room (RxR)"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "manipulathor_armpointnav",
+        "title": "ManipulaTHOR / ArmPointNav"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "teach",
+        "title": "TEACh"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "meta_world",
+        "title": "Meta-World"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "rlbench",
+        "title": "RLBench"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "robosuite_benchmark_suite",
+        "title": "robosuite Benchmark Suite"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "robomimic",
+        "title": "RoboMimic"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "furniturebench",
+        "title": "FurnitureBench"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "maniskill2",
+        "title": "ManiSkill2"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "simpler_evaluating_real_world_robot_manipulation_policies_in",
+        "title": "SIMPLER / Evaluating Real-World Robot Manipulation Policies in Simulation"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "meta_world_2",
+        "title": "Meta-World+"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "robotwin",
+        "title": "RoboTwin"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "robotwin_2_0",
+        "title": "RoboTwin 2.0"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "viser",
+        "title": "VISER"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "calvin",
+        "title": "CALVIN"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "vlabench",
+        "title": "VLABench"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "robocerebra",
+        "title": "RoboCerebra"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "roboeval",
+        "title": "RoboEval"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "robohiman_himan_bench",
+        "title": "RoboHiMan / HiMan-Bench"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "composuite",
+        "title": "CompoSuite"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "libero",
+        "title": "LIBERO"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "behavior_1k",
+        "title": "BEHAVIOR-1K"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "robocasa",
+        "title": "RoboCasa"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "robocasa365",
+        "title": "RoboCasa365"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "benchmarking_vla_models_on_robotic_learning_tasks",
+        "title": "Benchmarking VLA Models on Robotic Learning Tasks"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "embodied_arena",
+        "title": "Embodied Arena"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "embodiedbench",
+        "title": "EmbodiedBench"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "robobench",
+        "title": "RoboBench"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "openeqa",
+        "title": "OpenEQA"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "vsi_bench",
+        "title": "VSI-Bench"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "physbench",
+        "title": "PhysBench"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "point_it_out_pio",
+        "title": "Point-It-Out (PIO)"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "site",
+        "title": "SITE"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "embodied3dbench",
+        "title": "Embodied3DBench"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "safeagentbench",
+        "title": "SafeAgentBench"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "agentsafe",
+        "title": "AGENTSAFE"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "is_bench",
+        "title": "IS-Bench"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "is_bench_interactive_safety_of_vlm_driven_embodied",
+        "title": "IS-Bench: Interactive Safety of VLM-Driven Embodied Agents"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "safe_beal_safeplan_bench",
+        "title": "Safe-BeAl / SafePlan-Bench"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "besafe_bench_behavioral_safety_risks_of_situated_agents",
+        "title": "BeSafe-Bench: Behavioral Safety Risks of Situated Agents"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "embodiedgovbench",
+        "title": "EmbodiedGovBench"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "hazardarena_semantic_safety_in_vla_models",
+        "title": "HazardArena: Semantic Safety in VLA Models"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "homesafe_bench_unsafe_action_detection_in_household_scenarios",
+        "title": "HomeSafe-Bench: Unsafe Action Detection in Household Scenarios"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "so_101_vla_benchmark",
+        "title": "SO-101 VLA Benchmark"
+      },
+      {
+        "atlas_id": "B",
+        "paper_id": "safevla_bench_success_safety_gap_in_vla_evaluation",
+        "title": "SafeVLA-Bench: Success–Safety Gap in VLA Evaluation"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "wm18",
+        "title": "World Models (Ha & Schmidhuber)"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "planet",
+        "title": "PlaNet"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "dreamerv1",
+        "title": "Dreamer V1"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "muzero",
+        "title": "MuZero"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "dreamerv2",
+        "title": "DreamerV2"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "dreamerv3",
+        "title": "DreamerV3"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "trt",
+        "title": "Trajectory Transformer"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "dt",
+        "title": "Decision Transformer"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "gato",
+        "title": "GATO"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "act",
+        "title": "ACT (Action Chunking)"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "diffpol",
+        "title": "Diffusion Policy"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "rt2",
+        "title": "RT-2"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "unipi",
+        "title": "UniPi"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "vlp",
+        "title": "VLP"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "gr1",
+        "title": "GR-1"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "openvla",
+        "title": "OpenVLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "pi0",
+        "title": "π₀ (pi-zero)"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "avdc",
+        "title": "AVDC"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "vidman",
+        "title": "VidMan"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "pad",
+        "title": "PAD"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "genie",
+        "title": "Genie"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "gr2",
+        "title": "GR-2"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "irasim",
+        "title": "IRASim"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "lapa",
+        "title": "LAPA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "enerverse",
+        "title": "EnerVerse"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "enerverse_ac",
+        "title": "EnerVerse-AC"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "gen2act",
+        "title": "Gen2Act"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "videopolicy",
+        "title": "VideoPolicy (Video Generators)"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "mimicvideo",
+        "title": "mimic-video"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "upvla",
+        "title": "UP-VLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "worldvla",
+        "title": "WorldVLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "dreamvla",
+        "title": "DreamVLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "univla",
+        "title": "UniVLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "cotvla",
+        "title": "CoT-VLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "f1",
+        "title": "F1"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "videovla",
+        "title": "VideoVLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "covar",
+        "title": "CoVAR"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "motus",
+        "title": "Motus"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "geact",
+        "title": "GE-Act"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "bagelvla",
+        "title": "BagelVLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "flare",
+        "title": "FLARE"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "groot_n1",
+        "title": "GR00T N1"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "saydream",
+        "title": "Say, Dream & Act"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "pi07",
+        "title": "π₀.7"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "3dflow",
+        "title": "3DFlowAction"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "uwm",
+        "title": "UWM (Unified World Model)"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "cosmos",
+        "title": "Cosmos Policy"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "giga",
+        "title": "GigaWorld-Policy"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "uddvla",
+        "title": "UD-VLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "fastwam",
+        "title": "Fast-WAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "dit4dit",
+        "title": "DiT4DiT"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "frappe",
+        "title": "FRAPPE"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "dust",
+        "title": "DUST"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "lda1b",
+        "title": "LDA-1B"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "cowvla",
+        "title": "CoWVLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "halo",
+        "title": "HALO"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "vlajepa",
+        "title": "VLA-JEPA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "wog",
+        "title": "WoG"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "dial",
+        "title": "DIAL"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "dreamzero",
+        "title": "DreamZero (WAM)"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "octo",
+        "title": "Octo"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "rdt1b",
+        "title": "RDT-1B"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "openvla_oft",
+        "title": "OpenVLA-OFT"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "pi05",
+        "title": "π₀.5"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "groot_n15",
+        "title": "GR00T N1.5"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "seer",
+        "title": "Seer (PIDM)"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "vpp",
+        "title": "VPP (Video Prediction Policy)"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "dreamgen",
+        "title": "DreamGen"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "robodreamer",
+        "title": "RoboDreamer"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "act2goal",
+        "title": "Act2Goal"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "veo_act",
+        "title": "Veo-Act"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "vidar",
+        "title": "Vidar"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "uva",
+        "title": "UVA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "video2act",
+        "title": "Video2Act"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "internvla_a1",
+        "title": "InternVLA-A1"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "thinkact",
+        "title": "ThinkAct"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "rynvla",
+        "title": "RynnVLA-002"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "gigabrain0",
+        "title": "GigaBrain-0"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "memoryvla",
+        "title": "MemoryVLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "drema",
+        "title": "DreMa (DREMA)"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "gigabrain05m",
+        "title": "GigaBrain-0.5M*"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "worldvla_loop",
+        "title": "World-VLA-Loop"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "world_action_verifier",
+        "title": "World Action Verifier"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "vjepa2",
+        "title": "V-JEPA 2 / V-JEPA 2-AC"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "wav_value_action",
+        "title": "WAV (World-Value-Action)"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "jepavla",
+        "title": "JEPA-VLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "oawam",
+        "title": "OA-WAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "lingbot_va",
+        "title": "LingBot-VA (Causal WM)"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "x_wam",
+        "title": "X-WAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "ea_wm",
+        "title": "EA-WM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "being_h07",
+        "title": "Being-H0.7"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "rdt2",
+        "title": "RDT-2"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "tau0_wm",
+        "title": "τ₀-WM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "motubrain",
+        "title": "MotuBrain"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "starry",
+        "title": "STARRY"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "efficient_wam",
+        "title": "Efficient-WAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "aha_wam",
+        "title": "AHA-WAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "lawam",
+        "title": "LaWAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "himem_wam",
+        "title": "HiMem-WAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "geosem_wam",
+        "title": "GeoSem-WAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "fawam",
+        "title": "FAWAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "dream_tac",
+        "title": "Dream-Tac"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "adawam",
+        "title": "AdaWAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "motionwam",
+        "title": "MotionWAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "world_pilot",
+        "title": "World Pilot"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "ewam",
+        "title": "EWAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "agra_foresight",
+        "title": "AGRA / Making Foresight Actionable"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "trust_imagination",
+        "title": "When to Trust Imagination"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "oscar_wm",
+        "title": "OSCAR"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "qwen_robotworld",
+        "title": "Qwen-RobotWorld"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "mu0_trace_wm",
+        "title": "μ₀ Trace WM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "wam_diagnostics",
+        "title": "Beyond Task Success"
+      }
+    ],
+    "missing_source_confidence": [
+      {
+        "atlas_id": "WAM",
+        "paper_id": "wm18",
+        "title": "World Models (Ha & Schmidhuber)"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "planet",
+        "title": "PlaNet"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "dreamerv1",
+        "title": "Dreamer V1"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "muzero",
+        "title": "MuZero"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "dreamerv2",
+        "title": "DreamerV2"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "dreamerv3",
+        "title": "DreamerV3"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "trt",
+        "title": "Trajectory Transformer"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "dt",
+        "title": "Decision Transformer"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "gato",
+        "title": "GATO"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "act",
+        "title": "ACT (Action Chunking)"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "diffpol",
+        "title": "Diffusion Policy"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "rt2",
+        "title": "RT-2"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "unipi",
+        "title": "UniPi"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "vlp",
+        "title": "VLP"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "gr1",
+        "title": "GR-1"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "openvla",
+        "title": "OpenVLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "pi0",
+        "title": "π₀ (pi-zero)"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "avdc",
+        "title": "AVDC"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "vidman",
+        "title": "VidMan"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "pad",
+        "title": "PAD"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "genie",
+        "title": "Genie"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "gr2",
+        "title": "GR-2"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "irasim",
+        "title": "IRASim"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "lapa",
+        "title": "LAPA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "enerverse",
+        "title": "EnerVerse"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "enerverse_ac",
+        "title": "EnerVerse-AC"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "gen2act",
+        "title": "Gen2Act"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "videopolicy",
+        "title": "VideoPolicy (Video Generators)"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "mimicvideo",
+        "title": "mimic-video"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "upvla",
+        "title": "UP-VLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "worldvla",
+        "title": "WorldVLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "dreamvla",
+        "title": "DreamVLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "univla",
+        "title": "UniVLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "cotvla",
+        "title": "CoT-VLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "f1",
+        "title": "F1"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "videovla",
+        "title": "VideoVLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "covar",
+        "title": "CoVAR"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "motus",
+        "title": "Motus"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "geact",
+        "title": "GE-Act"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "bagelvla",
+        "title": "BagelVLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "flare",
+        "title": "FLARE"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "groot_n1",
+        "title": "GR00T N1"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "saydream",
+        "title": "Say, Dream & Act"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "pi07",
+        "title": "π₀.7"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "3dflow",
+        "title": "3DFlowAction"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "uwm",
+        "title": "UWM (Unified World Model)"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "cosmos",
+        "title": "Cosmos Policy"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "giga",
+        "title": "GigaWorld-Policy"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "uddvla",
+        "title": "UD-VLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "fastwam",
+        "title": "Fast-WAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "dit4dit",
+        "title": "DiT4DiT"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "frappe",
+        "title": "FRAPPE"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "dust",
+        "title": "DUST"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "lda1b",
+        "title": "LDA-1B"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "cowvla",
+        "title": "CoWVLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "halo",
+        "title": "HALO"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "vlajepa",
+        "title": "VLA-JEPA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "wog",
+        "title": "WoG"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "dial",
+        "title": "DIAL"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "dreamzero",
+        "title": "DreamZero (WAM)"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "octo",
+        "title": "Octo"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "rdt1b",
+        "title": "RDT-1B"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "openvla_oft",
+        "title": "OpenVLA-OFT"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "pi05",
+        "title": "π₀.5"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "groot_n15",
+        "title": "GR00T N1.5"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "seer",
+        "title": "Seer (PIDM)"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "vpp",
+        "title": "VPP (Video Prediction Policy)"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "dreamgen",
+        "title": "DreamGen"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "robodreamer",
+        "title": "RoboDreamer"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "act2goal",
+        "title": "Act2Goal"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "veo_act",
+        "title": "Veo-Act"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "vidar",
+        "title": "Vidar"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "uva",
+        "title": "UVA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "video2act",
+        "title": "Video2Act"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "internvla_a1",
+        "title": "InternVLA-A1"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "thinkact",
+        "title": "ThinkAct"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "rynvla",
+        "title": "RynnVLA-002"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "gigabrain0",
+        "title": "GigaBrain-0"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "memoryvla",
+        "title": "MemoryVLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "drema",
+        "title": "DreMa (DREMA)"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "gigabrain05m",
+        "title": "GigaBrain-0.5M*"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "worldvla_loop",
+        "title": "World-VLA-Loop"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "world_action_verifier",
+        "title": "World Action Verifier"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "vjepa2",
+        "title": "V-JEPA 2 / V-JEPA 2-AC"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "wav_value_action",
+        "title": "WAV (World-Value-Action)"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "jepavla",
+        "title": "JEPA-VLA"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "oawam",
+        "title": "OA-WAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "lingbot_va",
+        "title": "LingBot-VA (Causal WM)"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "x_wam",
+        "title": "X-WAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "ea_wm",
+        "title": "EA-WM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "being_h07",
+        "title": "Being-H0.7"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "rdt2",
+        "title": "RDT-2"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "tau0_wm",
+        "title": "τ₀-WM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "motubrain",
+        "title": "MotuBrain"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "starry",
+        "title": "STARRY"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "efficient_wam",
+        "title": "Efficient-WAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "aha_wam",
+        "title": "AHA-WAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "lawam",
+        "title": "LaWAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "himem_wam",
+        "title": "HiMem-WAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "geosem_wam",
+        "title": "GeoSem-WAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "fawam",
+        "title": "FAWAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "dream_tac",
+        "title": "Dream-Tac"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "adawam",
+        "title": "AdaWAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "motionwam",
+        "title": "MotionWAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "world_pilot",
+        "title": "World Pilot"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "ewam",
+        "title": "EWAM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "agra_foresight",
+        "title": "AGRA / Making Foresight Actionable"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "trust_imagination",
+        "title": "When to Trust Imagination"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "oscar_wm",
+        "title": "OSCAR"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "qwen_robotworld",
+        "title": "Qwen-RobotWorld"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "mu0_trace_wm",
+        "title": "μ₀ Trace WM"
+      },
+      {
+        "atlas_id": "WAM",
+        "paper_id": "wam_diagnostics",
+        "title": "Beyond Task Success"
+      }
+    ],
+    "broken_relations": [],
+    "watchlist_entries": [
+      {
+        "paper_id": "genie_envisioner",
+        "title": "Genie Envisioner"
+      },
+      {
+        "paper_id": "hindsight_for_foresight",
+        "title": "Hindsight for Foresight"
+      },
+      {
+        "paper_id": "wog",
+        "title": "WoG"
+      }
+    ],
+    "unreviewed_relations": [],
+    "cross_atlas_papers": [
+      {
+        "paper_id": "from_human_videos_to_robot_manipulation_survey_on",
+        "title": "From Human Videos to Robot Manipulation: A Survey on Scalable VLA Data",
+        "atlases": [
+          "A",
+          "D"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "qt_opt_scalable_deep_reinforcement_learning_for_vision",
+        "title": "QT-Opt: Scalable Deep Reinforcement Learning for Vision-Based Robotic Manipulation",
+        "atlases": [
+          "A",
+          "I"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "bc_z_zero_shot_task_generalization_with_robotic_2",
+        "title": "BC-Z: Zero-Shot Task Generalization with Robotic Imitation Learning",
+        "atlases": [
+          "A",
+          "E",
+          "F"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "learning_latent_plans_from_play",
+        "title": "Learning Latent Plans from Play",
+        "atlases": [
+          "A",
+          "F"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "r3m_reusable_representations_for_robot_manipulation_from_human",
+        "title": "R3M: Reusable Representations for Robot Manipulation from Human Video",
+        "atlases": [
+          "A",
+          "D"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "vip_value_implicit_pre_training_from_human_videos",
+        "title": "VIP: Value-Implicit Pre-Training from Human Videos",
+        "atlases": [
+          "A",
+          "D"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "mobile_aloha_learning_bimanual_mobile_manipulation_with_low",
+        "title": "Mobile ALOHA: Learning Bimanual Mobile Manipulation with Low-Cost Whole-Body Teleoperation",
+        "atlases": [
+          "A",
+          "F"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "hg_dagger_interactive_imitation_learning_with_human_experts",
+        "title": "HG-DAgger: Interactive Imitation Learning with Human Experts",
+        "atlases": [
+          "A",
+          "F"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "robomimic",
+        "title": "RoboMimic",
+        "atlases": [
+          "B",
+          "F"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "robotwin",
+        "title": "RoboTwin",
+        "atlases": [
+          "B",
+          "C"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "robotwin_2_0",
+        "title": "RoboTwin 2.0",
+        "atlases": [
+          "B",
+          "C"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "robocasa",
+        "title": "RoboCasa",
+        "atlases": [
+          "B",
+          "C"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "robocasa365",
+        "title": "RoboCasa365",
+        "atlases": [
+          "B",
+          "C"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "agentsafe",
+        "title": "AGENTSAFE",
+        "atlases": [
+          "B",
+          "M"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "is_bench",
+        "title": "IS-Bench",
+        "atlases": [
+          "B",
+          "M"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "safe_beal_safeplan_bench",
+        "title": "Safe-BeAl / SafePlan-Bench",
+        "atlases": [
+          "B",
+          "M"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "besafe_bench_behavioral_safety_risks_of_situated_agents",
+        "title": "BeSafe-Bench: Behavioral Safety Risks of Situated Agents",
+        "atlases": [
+          "B",
+          "M"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "hazardarena_semantic_safety_in_vla_models",
+        "title": "HazardArena: Semantic Safety in VLA Models",
+        "atlases": [
+          "B",
+          "M"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "homesafe_bench_unsafe_action_detection_in_household_scenarios",
+        "title": "HomeSafe-Bench: Unsafe Action Detection in Household Scenarios",
+        "atlases": [
+          "B",
+          "M"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "safevla_bench_success_safety_gap_in_vla_evaluation",
+        "title": "SafeVLA-Bench: Success–Safety Gap in VLA Evaluation",
+        "atlases": [
+          "B",
+          "M"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "world_models",
+        "title": "World Models",
+        "atlases": [
+          "C",
+          "H",
+          "WAM"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "mimicgen",
+        "title": "MimicGen",
+        "atlases": [
+          "C",
+          "F"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "robodreamer",
+        "title": "RoboDreamer",
+        "atlases": [
+          "C",
+          "H",
+          "WAM"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "genie_generative_interactive_environments",
+        "title": "Genie: Generative Interactive Environments",
+        "atlases": [
+          "C",
+          "E",
+          "H",
+          "WAM"
+        ],
+        "count": 4
+      },
+      {
+        "paper_id": "irasim",
+        "title": "IRASim",
+        "atlases": [
+          "C",
+          "H",
+          "WAM"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "drema",
+        "title": "DreMa",
+        "atlases": [
+          "C",
+          "H",
+          "WAM"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "genie_envisioner",
+        "title": "Genie Envisioner",
+        "atlases": [
+          "C",
+          "H",
+          "WAM"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "transporter_networks",
+        "title": "Transporter Networks",
+        "atlases": [
+          "D",
+          "E",
+          "F"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "cliport",
+        "title": "CLIPort",
+        "atlases": [
+          "D",
+          "E",
+          "G"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "peract_perceiver_actor",
+        "title": "PerAct / Perceiver-Actor",
+        "atlases": [
+          "D",
+          "E",
+          "G"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "object_centric_3d_motion_field",
+        "title": "Object-centric 3D Motion Field",
+        "atlases": [
+          "D",
+          "H"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "v_jepa_2_v_jepa_2_ac",
+        "title": "V-JEPA 2 / V-JEPA 2-AC",
+        "atlases": [
+          "D",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "embodied_robot_manipulation_in_foundation_model_era",
+        "title": "Embodied Robot Manipulation in Foundation Model Era",
+        "atlases": [
+          "D",
+          "J"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "vla_jepa",
+        "title": "VLA-JEPA",
+        "atlases": [
+          "D",
+          "H",
+          "WAM"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "decision_transformer",
+        "title": "Decision Transformer",
+        "atlases": [
+          "E",
+          "F",
+          "WAM"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "trajectory_transformer",
+        "title": "Trajectory Transformer",
+        "atlases": [
+          "E",
+          "F",
+          "WAM"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "saycan_do_as_i_can_not_as_i",
+        "title": "SayCan / Do As I Can, Not As I Say",
+        "atlases": [
+          "E",
+          "G",
+          "K",
+          "N"
+        ],
+        "count": 4
+      },
+      {
+        "paper_id": "gato",
+        "title": "Gato",
+        "atlases": [
+          "E",
+          "G",
+          "WAM"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "behavior_transformer_bet",
+        "title": "Behavior Transformer (BeT)",
+        "atlases": [
+          "E",
+          "F"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "code_as_policies",
+        "title": "Code as Policies",
+        "atlases": [
+          "E",
+          "K",
+          "N"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "vima",
+        "title": "VIMA",
+        "atlases": [
+          "E",
+          "G"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "rt_1_robotics_transformer_for_real_world_control",
+        "title": "RT-1: Robotics Transformer for Real-World Control at Scale",
+        "atlases": [
+          "E",
+          "F",
+          "G"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "act_aloha_learning_fine_grained_bimanual_manipulation_with",
+        "title": "ACT / ALOHA: Learning Fine-Grained Bimanual Manipulation with Low-Cost Hardware",
+        "atlases": [
+          "E",
+          "F",
+          "L",
+          "WAM"
+        ],
+        "count": 4
+      },
+      {
+        "paper_id": "diffusion_policy",
+        "title": "Diffusion Policy",
+        "atlases": [
+          "E",
+          "F",
+          "WAM"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "rt_2",
+        "title": "RT-2",
+        "atlases": [
+          "E",
+          "G",
+          "L",
+          "WAM"
+        ],
+        "count": 4
+      },
+      {
+        "paper_id": "3d_diffuser_actor",
+        "title": "3D Diffuser Actor",
+        "atlases": [
+          "E",
+          "F"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "vq_bet",
+        "title": "VQ-BeT",
+        "atlases": [
+          "E",
+          "F"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "openvla",
+        "title": "OpenVLA",
+        "atlases": [
+          "E",
+          "G",
+          "L",
+          "WAM"
+        ],
+        "count": 4
+      },
+      {
+        "paper_id": "rdt_1b",
+        "title": "RDT-1B",
+        "atlases": [
+          "E",
+          "G",
+          "J",
+          "WAM"
+        ],
+        "count": 4
+      },
+      {
+        "paper_id": "lapa",
+        "title": "LAPA",
+        "atlases": [
+          "E",
+          "H",
+          "WAM"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "pi0",
+        "title": "π₀",
+        "atlases": [
+          "E",
+          "G",
+          "L",
+          "WAM"
+        ],
+        "count": 4
+      },
+      {
+        "paper_id": "fast_fast",
+        "title": "FAST / FAST+",
+        "atlases": [
+          "E",
+          "G",
+          "L"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "openvla_oft",
+        "title": "OpenVLA-OFT",
+        "atlases": [
+          "E",
+          "G",
+          "L",
+          "WAM"
+        ],
+        "count": 4
+      },
+      {
+        "paper_id": "pd_vla",
+        "title": "PD-VLA",
+        "atlases": [
+          "E",
+          "L"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "3d_flowmatch_actor",
+        "title": "3D FlowMatch Actor",
+        "atlases": [
+          "E",
+          "F"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "faster_fastervla",
+        "title": "FASTer / FASTerVLA",
+        "atlases": [
+          "E",
+          "G",
+          "L"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "cola_flow_policy",
+        "title": "CoLA-Flow Policy",
+        "atlases": [
+          "E",
+          "F"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "lawam",
+        "title": "LaWAM",
+        "atlases": [
+          "E",
+          "H",
+          "WAM"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "roboagent_mt_act",
+        "title": "RoboAgent / MT-ACT",
+        "atlases": [
+          "F",
+          "K"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "lotus",
+        "title": "LOTUS",
+        "atlases": [
+          "F",
+          "K"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "robocat",
+        "title": "RoboCat",
+        "atlases": [
+          "G",
+          "I"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "voxposer",
+        "title": "VoxPoser",
+        "atlases": [
+          "G",
+          "K",
+          "N"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "rt_x_open_x_embodiment",
+        "title": "RT-X / Open X-Embodiment",
+        "atlases": [
+          "G",
+          "J"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "octo",
+        "title": "Octo",
+        "atlases": [
+          "G",
+          "J",
+          "WAM"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "robomamba",
+        "title": "RoboMamba",
+        "atlases": [
+          "G",
+          "L"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "gr00t_n1",
+        "title": "GR00T N1",
+        "atlases": [
+          "G",
+          "J",
+          "WAM"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "cot_vla",
+        "title": "CoT-VLA",
+        "atlases": [
+          "G",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "pi0_5",
+        "title": "π₀.5",
+        "atlases": [
+          "G",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "smolvla",
+        "title": "SmolVLA",
+        "atlases": [
+          "G",
+          "L"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "long_vla",
+        "title": "Long-VLA",
+        "atlases": [
+          "G",
+          "K"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "halo",
+        "title": "HALO",
+        "atlases": [
+          "G",
+          "H",
+          "WAM"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "pi0_7",
+        "title": "π₀.7",
+        "atlases": [
+          "G",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "x_diffvla",
+        "title": "X-DiffVLA",
+        "atlases": [
+          "G",
+          "J"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "ervla",
+        "title": "ERVLA",
+        "atlases": [
+          "G",
+          "N"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "hybridvla",
+        "title": "HybridVLA",
+        "atlases": [
+          "G",
+          "H",
+          "WAM"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "dysl_vla",
+        "title": "DySL-VLA",
+        "atlases": [
+          "G",
+          "L"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "planet",
+        "title": "PlaNet",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "muzero",
+        "title": "MuZero",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "dreamer",
+        "title": "Dreamer",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "dreamerv2",
+        "title": "DreamerV2",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "dreamerv3",
+        "title": "DreamerV3",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "unipi",
+        "title": "UniPi",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "gr_1",
+        "title": "GR-1",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "vidman",
+        "title": "VidMan",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "up_vla",
+        "title": "UP-VLA",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "uwm_unified_world_models",
+        "title": "UWM / Unified World Models",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "enerverse_ac",
+        "title": "EnerVerse-AC",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "worldvla",
+        "title": "WorldVLA",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "dreamvla",
+        "title": "DreamVLA",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "videopolicy_video_generators_are_robot_policies",
+        "title": "VideoPolicy / Video Generators Are Robot Policies",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "dreamgen",
+        "title": "DreamGen",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "flare",
+        "title": "FLARE",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "videovla",
+        "title": "VideoVLA",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "vla_rft",
+        "title": "VLA-RFT",
+        "atlases": [
+          "H",
+          "I"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "world_vla_loop",
+        "title": "World-VLA-Loop",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "jepa_vla",
+        "title": "JEPA-VLA",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "lda_1b",
+        "title": "LDA-1B",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "dreamzero_world_action_models_are_zero_shot_policies",
+        "title": "DreamZero / World Action Models are Zero-shot Policies",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "frappe",
+        "title": "FRAPPE",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "dit4dit",
+        "title": "DiT4DiT",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "fast_wam",
+        "title": "Fast-WAM",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "gigaworld_policy",
+        "title": "GigaWorld-Policy",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "dial",
+        "title": "DIAL",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "cosmos_policy",
+        "title": "Cosmos Policy",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "wmpo",
+        "title": "WMPO",
+        "atlases": [
+          "H",
+          "I"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "vlp",
+        "title": "VLP",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "avdc",
+        "title": "AVDC",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "gr_2",
+        "title": "GR-2",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "pad",
+        "title": "PAD",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "vpp_video_prediction_policy",
+        "title": "VPP (Video Prediction Policy)",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "seer_pidm",
+        "title": "Seer (PIDM)",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "video2act",
+        "title": "Video2Act",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "gen2act",
+        "title": "Gen2Act",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "enerverse",
+        "title": "EnerVerse",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "uva",
+        "title": "UVA",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "3dflowaction",
+        "title": "3DFlowAction",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "vidar",
+        "title": "Vidar",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "thinkact",
+        "title": "ThinkAct",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "memoryvla",
+        "title": "MemoryVLA",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "f1",
+        "title": "F1",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "gigabrain_0",
+        "title": "GigaBrain-0",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "dust",
+        "title": "DUST",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "ud_vla",
+        "title": "UD-VLA",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "motus",
+        "title": "Motus",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "mimic_video",
+        "title": "mimic-video",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "covar",
+        "title": "CoVAR",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "act2goal",
+        "title": "Act2Goal",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "gr00t_n1_5",
+        "title": "GR00T N1.5",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "rynnvla_002",
+        "title": "RynnVLA-002",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "internvla_a1",
+        "title": "InternVLA-A1",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "lingbot_va_causal_wm",
+        "title": "LingBot-VA (Causal WM)",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "rdt_2",
+        "title": "RDT-2",
+        "atlases": [
+          "H",
+          "J",
+          "WAM"
+        ],
+        "count": 3
+      },
+      {
+        "paper_id": "bagelvla",
+        "title": "BagelVLA",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "say_dream_act",
+        "title": "Say, Dream & Act",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "gigabrain_0_5m",
+        "title": "GigaBrain-0.5M*",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "cowvla",
+        "title": "CoWVLA",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "world_action_verifier",
+        "title": "World Action Verifier",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "veo_act",
+        "title": "Veo-Act",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "wav_world_value_action",
+        "title": "WAV (World-Value-Action)",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "x_wam",
+        "title": "X-WAM",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "starry",
+        "title": "STARRY",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "motubrain",
+        "title": "MotuBrain",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "being_h0_7",
+        "title": "Being-H0.7",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "when_to_trust_imagination",
+        "title": "When to Trust Imagination",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "oa_wam",
+        "title": "OA-WAM",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "0_wm",
+        "title": "τ₀-WM",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "beyond_task_success",
+        "title": "Beyond Task Success",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "geosem_wam",
+        "title": "GeoSem-WAM",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "oscar",
+        "title": "OSCAR",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "adawam",
+        "title": "AdaWAM",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "fawam",
+        "title": "FAWAM",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "dream_tac",
+        "title": "Dream-Tac",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "motionwam",
+        "title": "MotionWAM",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "aha_wam",
+        "title": "AHA-WAM",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "efficient_wam",
+        "title": "Efficient-WAM",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "himem_wam",
+        "title": "HiMem-WAM",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "agra_making_foresight_actionable",
+        "title": "AGRA / Making Foresight Actionable",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "world_pilot",
+        "title": "World Pilot",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "ewam",
+        "title": "EWAM",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "0_trace_wm",
+        "title": "μ₀ Trace WM",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "qwen_robotworld",
+        "title": "Qwen-RobotWorld",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "ea_wm",
+        "title": "EA-WM",
+        "atlases": [
+          "H",
+          "WAM"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "safevla_safety_alignment_of_vla_via_constrained_learning",
+        "title": "SafeVLA: Safety Alignment of VLA via Constrained Learning",
+        "atlases": [
+          "I",
+          "M"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "hierarchical_planning_with_geometric_and_symbolic_scene_graphs",
+        "title": "Hierarchical Planning with Geometric and Symbolic Scene Graphs",
+        "atlases": [
+          "K",
+          "N"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "language_grounded_hierarchical_planning_with_multi_robot_3d",
+        "title": "Language-Grounded Hierarchical Planning with Multi-Robot 3D Scene Graphs",
+        "atlases": [
+          "K",
+          "N"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "llm_as_bt_planner",
+        "title": "LLM as BT-Planner",
+        "atlases": [
+          "K",
+          "N"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "llm_grop",
+        "title": "LLM-GROP",
+        "atlases": [
+          "K",
+          "N"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "multimodal_behavior_tree_generation",
+        "title": "Multimodal Behavior Tree Generation",
+        "atlases": [
+          "K",
+          "N"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "sayplan",
+        "title": "SayPlan",
+        "atlases": [
+          "K",
+          "N"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "symbolic_state_space_optimization_s3o",
+        "title": "Symbolic State Space Optimization (S3O)",
+        "atlases": [
+          "K",
+          "N"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "visually_grounded_task_and_motion_planning_grop",
+        "title": "Visually Grounded Task and Motion Planning (GROP)",
+        "atlases": [
+          "K",
+          "N"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "inner_monologue",
+        "title": "Inner Monologue",
+        "atlases": [
+          "K",
+          "N"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "language_guided_long_horizon_manipulation_with_llm_planning",
+        "title": "Language-Guided Long Horizon Manipulation with LLM Planning and Visual Perception",
+        "atlases": [
+          "K",
+          "N"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "llm_map",
+        "title": "LLM+MAP",
+        "atlases": [
+          "K",
+          "N"
+        ],
+        "count": 2
+      },
+      {
+        "paper_id": "progprompt",
+        "title": "ProgPrompt",
+        "atlases": [
+          "K",
+          "N"
+        ],
+        "count": 2
+      }
+    ],
+    "low_confidence_entries": [
+      {
+        "paper_id": "genie_envisioner",
+        "title": "Genie Envisioner"
+      }
+    ],
+    "papers_without_source": [
+      {
+        "paper_id": "wog",
+        "title": "WoG"
+      }
+    ],
+    "stats": {
+      "total_canonical_papers": 685,
+      "total_entries": 902,
+      "total_relations": 1556,
+      "duplicate_titles": 0,
+      "missing_canonical_paper_id": 241,
+      "missing_source_confidence": 112,
+      "broken_relations": 0,
+      "watchlist_entries": 3,
+      "unreviewed_relations": 0,
+      "cross_atlas_papers": 175,
+      "low_confidence_entries": 1,
+      "papers_without_source": 1
+    }
+  }
+}

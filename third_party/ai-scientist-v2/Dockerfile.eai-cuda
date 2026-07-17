@@ -1,0 +1,20 @@
+FROM pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    MPLBACKEND=Agg \
+    EAI_CAMPAIGN_CONTAINER=1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential git texlive-latex-base texlive-latex-extra poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/ai-scientist-v2
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+
+RUN useradd --create-home --uid 10001 scientist \
+    && chown -R scientist:scientist /opt/ai-scientist-v2
+USER scientist
+CMD ["python", "-c", "import torch; from ai_scientist.treesearch.journal import Journal; print({'cuda': torch.cuda.is_available()})"]

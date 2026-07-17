@@ -1,0 +1,50 @@
+:root {
+  color-scheme: light;
+  --bg: #f4f7fa;
+  --sidebar: #eaf2f6;
+  --panel: #ffffff;
+  --panel-soft: #f8f9fa;
+  --ink: #202124;
+  --muted: #74777a;
+  --faint: #a3a6a8;
+  --line: rgba(36, 43, 52, 0.11);
+  --line-strong: rgba(36, 43, 52, 0.19);
+  --blue: #356ee8;
+  --green: #118866;
+  --violet: #7856d8;
+  --orange: #d56b2d;
+  --cyan: #1689a7;
+  --rose: #c94f70;
+  --gold: #ca8a04;
+  --red: #dc2626;
+  --blue-line: rgba(11, 107, 255, 0.28);
+  --green-line: rgba(7, 148, 85, 0.28);
+  --violet-line: rgba(139, 61, 255, 0.25);
+  --orange-line: rgba(240, 100, 24, 0.25);
+  --cyan-line: rgba(8, 145, 178, 0.25);
+  --rose-line: rgba(225, 29, 72, 0.22);
+  --blue-soft: rgba(11, 107, 255, 0.055);
+  --green-soft: rgba(7, 148, 85, 0.055);
+  --violet-soft: rgba(139, 61, 255, 0.055);
+  --orange-soft: rgba(240, 100, 24, 0.055);
+  --cyan-soft: rgba(8, 145, 178, 0.055);
+  --rose-soft: rgba(225, 29, 72, 0.052);
+  --shadow: 0 8px 24px rgba(22, 24, 26, 0.08);
+  --radius-compact: 8px;
+  --radius-control: 12px;
+  --radius-surface: 16px;
+  --radius: var(--radius-control);
+  --motion-fast: 160ms;
+  --motion-layout: 220ms;
+  --motion-drawer: 240ms;
+  --ease-product: cubic-bezier(.22, 1, .36, 1);
+  --left-width: 248px;
+  --right-width: 400px;
+  font-family: "Segoe UI Variable", "Microsoft YaHei UI", "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; overflow: hidden; background: var(--bg); color: var(--ink); }
+button, input, select, textarea { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+button { color: inherit; }

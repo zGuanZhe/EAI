@@ -1,0 +1,37 @@
+.run-center { min-height: 100%; background: var(--panel); }
+.run-center-body { display: grid; width: min(980px, calc(100% - 48px)); gap: 30px; margin: 0 auto; padding: 28px 0 80px; }
+.run-center-body > section > header { display: flex; align-items: center; gap: 8px; min-height: 32px; color: var(--cyan); }
+.run-center-body > section > header strong { color: var(--ink); font-size: 14px; }
+.run-center-body > section > header span { margin-left: auto; color: var(--muted); font-size: 11px; }
+.knowledge-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; padding: 14px 0 18px; border-bottom: 1px solid var(--line); }
+.knowledge-metric { min-width: 0; }
+.knowledge-metric > div:first-child { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.knowledge-metric span { color: var(--muted); font-size: 11px; }
+.knowledge-metric strong { color: var(--ink); font-size: 17px; font-weight: 680; }
+.knowledge-meter { height: 3px; margin: 8px 0 6px; overflow: hidden; border-radius: 999px; background: var(--line); }
+.knowledge-meter i { display: block; height: 100%; border-radius: inherit; background: var(--blue); transition: width var(--motion-layout) var(--ease-product); }
+.knowledge-metric.tone-cyan .knowledge-meter i { background: var(--cyan); }
+.knowledge-metric.tone-green .knowledge-meter i { background: var(--green); }
+.knowledge-metric.tone-orange .knowledge-meter i { background: var(--orange); }
+.knowledge-metric.tone-violet .knowledge-meter i { background: var(--violet); }
+.knowledge-metric small { color: var(--faint); font-size: 10px; }
+.knowledge-runtime-line { display: flex; min-height: 48px; align-items: center; gap: 20px; color: var(--muted); font-size: 11px; }
+.knowledge-runtime-line > span { display: inline-flex; align-items: center; gap: 6px; }
+.knowledge-runtime-line > div { display: flex; gap: 6px; margin-left: auto; }
+.knowledge-runtime-line button, .knowledge-job-actions button, .knowledge-status-section .ui-empty button { display: inline-flex; min-height: 30px; align-items: center; justify-content: center; gap: 5px; border: 0; border-radius: var(--radius-compact); padding: 0 9px; background: var(--cyan-soft); color: var(--cyan); cursor: pointer; }
+.knowledge-job { display: grid; grid-template-columns: 18px minmax(180px, 1fr) minmax(120px, 240px) 54px auto; gap: 10px; align-items: center; min-height: 52px; border-top: 1px solid var(--line); }
+.knowledge-job > div:nth-child(2) { display: grid; gap: 2px; }
+.knowledge-job > div:nth-child(2) strong { font-size: 12px; }
+.knowledge-job > div:nth-child(2) span, .knowledge-job > em { color: var(--muted); font-size: 10px; font-style: normal; }
+.knowledge-job progress { width: 100%; height: 4px; accent-color: var(--cyan); }
+.knowledge-job-actions { display: flex; gap: 4px; }
+.knowledge-job-actions button { width: 30px; padding: 0; }
+.maintenance-list { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px; }
+.maintenance-list .ui-activity-row { grid-template-columns: 34px minmax(0,1fr); align-content: start; border-bottom: 0; background: var(--panel-soft); border-radius: 10px; padding: 13px; }
+.run-center-advanced { padding-top: 10px; border-top: 1px solid var(--line); }
+.run-center-advanced summary { cursor: pointer; color: var(--muted); font-size: 12px; font-weight: 700; }
+.run-center-advanced button, .run-center-advanced a { display: inline-flex; min-height: 32px; align-items: center; gap: 6px; margin: 10px 12px 0 0; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; text-decoration: none; }
+@media (max-width: 900px) { .knowledge-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .knowledge-job { grid-template-columns: 18px minmax(0, 1fr) auto; } .knowledge-job progress { grid-column: 2 / -1; grid-row: 2; } .knowledge-job > em { display: none; } }
+@media (max-width: 760px) { .run-center-body { width: calc(100% - 28px); } .maintenance-list { grid-template-columns: 1fr; } .knowledge-runtime-line { align-items: flex-start; flex-direction: column; gap: 8px; padding: 12px 0; } .knowledge-runtime-line > div { width: 100%; margin-left: 0; } }
+
+@media (prefers-reduced-motion: reduce) { .knowledge-meter i { transition: none; } }

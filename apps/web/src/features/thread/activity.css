@@ -1,0 +1,438 @@
+.agent-v2-activity {
+  margin-top: 12px;
+  color: #66717b;
+  font-size: 12px;
+}
+
+.agent-v2-status-row {
+  display: flex;
+  min-height: 30px;
+  gap: 7px;
+  align-items: center;
+}
+
+.agent-v2-status-row svg {
+  color: var(--blue);
+  flex: 0 0 auto;
+}
+
+.agent-v2-status-row em {
+  margin-left: auto;
+  color: #89929b;
+  font-style: normal;
+}
+
+.agent-v2-audit {
+  margin-top: 2px;
+}
+
+.agent-v2-audit > summary {
+  display: inline-flex;
+  min-height: 28px;
+  gap: 5px;
+  align-items: center;
+  color: #747d86;
+  cursor: pointer;
+  list-style: none;
+}
+
+.agent-v2-audit > summary::-webkit-details-marker { display: none; }
+.agent-v2-audit[open] > summary svg { transform: rotate(90deg); }
+.agent-v2-audit > div { padding: 4px 0 2px 18px; }
+
+.agent-v2-audit p {
+  display: flex;
+  min-height: 25px;
+  gap: 7px;
+  align-items: center;
+  margin: 0;
+  color: #7b848c;
+}
+
+.agent-v2-audit-call {
+  display: grid;
+  gap: 4px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.agent-v2-audit-call:last-child { border-bottom: 0; }
+.agent-v2-audit-call > span { display: flex; align-items: center; gap: 7px; }
+.agent-v2-audit-call > span strong { flex: 1; font-size: 12px; }
+.agent-v2-audit-call > span em,
+.agent-v2-audit-call small { color: var(--muted); font-size: 10px; font-style: normal; }
+.agent-v2-audit .agent-v2-audit-call p { display: block; min-height: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+
+.agent-v2-approval {
+  margin-top: 9px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(196, 126, 16, 0.075);
+}
+
+.agent-v2-approval > div:first-child {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  color: #8d5b0d;
+}
+
+.agent-v2-approval span {
+  display: grid;
+  gap: 2px;
+}
+
+.agent-v2-approval em {
+  color: #786c5a;
+  font-style: normal;
+  font-weight: 400;
+}
+
+.agent-v2-approval-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.agent-v2-approval-actions button {
+  display: inline-flex;
+  min-height: 31px;
+  gap: 5px;
+  align-items: center;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: rgba(32, 33, 36, 0.055);
+  color: #5d6268;
+  cursor: pointer;
+}
+
+.agent-v2-approval-actions button.primary {
+  background: #9b6513;
+  color: #fff;
+}
+
+.agent-v2-operation-receipt {
+  display: flex;
+  min-height: 32px;
+  margin-top: 8px;
+  padding: 0 4px 0 10px;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: var(--radius-md);
+  background: rgba(35, 145, 97, 0.08);
+  color: #28684f;
+}
+
+.agent-v2-operation-receipt button {
+  display: inline-flex;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.agent-v2-operation-receipt button:hover {
+  background: rgba(35, 145, 97, 0.1);
+}
+
+.agent-v2-command-preview {
+  display: grid;
+  margin-top: 8px;
+  padding: 10px;
+  gap: 8px;
+  border-radius: var(--radius-md);
+  background: rgba(185, 100, 24, 0.08);
+  color: #76501f;
+}
+
+.agent-v2-command-preview span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.agent-v2-command-preview em {
+  color: #7e7467;
+  font-style: normal;
+}
+
+.agent-v2-command-preview code {
+  overflow-x: auto;
+  color: #3f3830;
+  white-space: pre-wrap;
+}
+
+.assistant-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-top: 8px;
+  opacity: 0.72;
+}
+
+.assistant-actions button,
+.inline-result-action {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  min-height: 29px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #59616a;
+  cursor: pointer;
+  font-size: 11.5px;
+}
+
+.assistant-actions button:hover,
+.inline-result-action:hover {
+  background: rgba(32, 33, 36, 0.055);
+}
+
+.chat-error-row,
+.chat-empty-state {
+  margin: 14px 0;
+  padding: 12px 0;
+  color: #7a5555;
+  font-size: 13px;
+}
+
+.chat-empty-state {
+  color: #687078;
+  text-align: center;
+}
+
+.chat-empty-state p { margin: 5px 0 0; }
+
+.jump-latest {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  z-index: 18;
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(32, 33, 36, 0.12);
+  border-radius: 8px;
+  background: #fff;
+  color: #555d65;
+  box-shadow: 0 3px 8px rgba(20, 22, 24, 0.07);
+  cursor: pointer;
+  font-size: 11.5px;
+  transform: translateX(-50%);
+}
+
+.composer-shell {
+  width: min(820px, calc(100% - 40px));
+}
+
+.thread-main-shell {
+  grid-template-rows: minmax(0, 1fr) auto;
+  background: var(--bg);
+  transition: none;
+}
+
+.thread-main-shell > .workspace {
+  min-height: 0;
+  height: auto;
+  overflow: hidden;
+}
+
+.thread-main-shell > .composer-shell {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  z-index: 12;
+  margin: 0 auto;
+  padding: 10px 0 14px;
+  transform: none;
+}
+
+.thread-main-shell::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 0;
+  height: 84px;
+  border-top: 1px solid rgba(22, 137, 167, 0.12);
+  background: rgba(245, 247, 250, 0.98);
+  content: "";
+}
+
+.thread-main-shell > .composer-shell {
+  z-index: 1;
+}
+
+.composer-attachments {
+  margin: 0 8px 7px;
+}
+
+.composer-attachments > span {
+  background: #eef1f3;
+}
+
+.composer-attachments button {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #7b8289;
+  cursor: pointer;
+}
+
+.composer {
+  grid-template-columns: 86px 36px minmax(0, 1fr) auto auto;
+  gap: 3px;
+  align-items: end;
+}
+
+.composer-run-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.composer-mode-select {
+  display: flex;
+  width: 88px;
+  min-width: 88px;
+  min-height: 40px;
+  align-items: center;
+}
+
+.composer-mode-select select {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  outline: 0;
+  background: rgba(32, 99, 191, 0.08);
+  color: #355b86;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background var(--motion-fast) var(--ease-product), box-shadow var(--motion-fast) var(--ease-product);
+}
+
+.composer-mode-select select:hover {
+  background: rgba(32, 99, 191, 0.13);
+}
+
+.composer-mode-select select:focus-visible {
+  box-shadow: 0 0 0 2px rgba(53, 110, 232, 0.18);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.composer-context-chip {
+  position: static;
+  display: inline-flex;
+  width: 86px;
+  min-height: 40px;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(17, 136, 102, 0.08);
+  color: var(--green);
+}
+
+.tool-toggle {
+  border: 0;
+  background: rgba(120, 86, 216, 0.08);
+  color: var(--violet);
+}
+
+.send-button:not(:disabled):not(.stop) {
+  border: 0;
+  background: var(--blue);
+  color: #fff;
+}
+
+.context-materials > section:nth-of-type(1) .context-material-heading strong { color: var(--blue); }
+.context-materials > section:nth-of-type(2) .context-material-heading strong { color: var(--green); }
+.context-materials > section:nth-of-type(3) .context-material-heading strong { color: var(--violet); }
+
+.composer-context-chip:hover,
+.tool-toggle:hover {
+  background: rgba(32, 33, 36, 0.055);
+}
+
+.composer textarea {
+  height: auto;
+  min-height: 40px;
+}
+
+@media (max-width: 760px) {
+  .agent-thread-surface {
+    padding: 0;
+  }
+
+  .thread-chat-header {
+    grid-template-columns: 1fr;
+    gap: 5px;
+    min-height: 70px;
+  }
+
+  .thread-chat-header p {
+    overflow: hidden;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .agent-thread-surface .chat-log {
+    padding: 0 18px 24px;
+  }
+
+  .user-bubble,
+  .message-attachments {
+    max-width: 88%;
+  }
+
+  .composer-shell {
+    width: calc(100% - 20px);
+  }
+
+  .composer {
+    grid-template-columns: 36px 36px minmax(0, 1fr) 82px auto;
+  }
+
+  .composer-mode-select {
+    width: 82px;
+    min-width: 82px;
+  }
+
+  .composer-context-chip {
+    width: 36px;
+  }
+
+  .composer-context-chip span {
+    display: none;
+  }
+}

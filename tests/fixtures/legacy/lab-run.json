@@ -1,0 +1,47 @@
+{
+  "id": "lab-legacy-fixture",
+  "thread_id": "thread-legacy-fixture",
+  "project_id": "project-legacy-fixture",
+  "title": "Synthetic legacy experiment",
+  "goal": "Preserve historical experiment data",
+  "hypothesis": "A synthetic hypothesis",
+  "status": "completed",
+  "created_at": "2026-01-01T00:00:00Z",
+  "updated_at": "2026-01-02T00:00:00Z",
+  "linked_canvas_nodes": ["node-legacy-hypothesis"],
+  "stages": [
+    {
+      "id": "stage-legacy-baseline",
+      "title": "Baseline",
+      "status": "completed",
+      "summary": "Synthetic baseline",
+      "notes": "Completed without external data",
+      "updated_at": "2026-01-02T00:00:00Z"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "artifact-legacy-note",
+      "type": "note",
+      "title": "Synthetic artifact",
+      "summary": "No personal data",
+      "created_at": "2026-01-02T00:00:00Z"
+    }
+  ],
+  "findings": [
+    {
+      "id": "finding-legacy",
+      "title": "Synthetic finding",
+      "body": "Fixture-only result",
+      "created_at": "2026-01-02T00:00:00Z"
+    }
+  ],
+  "messages": [
+    {
+      "id": "lab-message-legacy",
+      "role": "user",
+      "content": "Synthetic transcript",
+      "created_at": "2026-01-01T00:00:00Z"
+    }
+  ]
+}

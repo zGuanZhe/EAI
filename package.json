@@ -1,0 +1,29 @@
+{
+  "name": "eai-desktop",
+  "private": true,
+  "version": "0.4.0",
+  "workspaces": ["apps/web"],
+  "scripts": {
+    "bootstrap": "powershell -ExecutionPolicy Bypass -File scripts/bootstrap.ps1",
+    "dev": "powershell -ExecutionPolicy Bypass -File scripts/dev-desktop.ps1",
+    "web:build": "npm --workspace @eai/web run build",
+    "web:test": "npm --workspace @eai/web run test",
+    "web:e2e": "powershell -ExecutionPolicy Bypass -File scripts/run-web-e2e.ps1",
+    "check:mojibake": "npm --workspace @eai/web run check:mojibake",
+    "check:architecture": "node scripts/check-architecture.mjs",
+    "sidecar:build": "powershell -ExecutionPolicy Bypass -File scripts/build-sidecar.ps1",
+    "sidecar:test": "powershell -ExecutionPolicy Bypass -File scripts/test-sidecar.ps1",
+    "service:test": "powershell -ExecutionPolicy Bypass -File scripts/test-service.ps1",
+    "campaign:docker-test": "powershell -ExecutionPolicy Bypass -File scripts/smoke-campaign.ps1",
+    "rust:check": "powershell -ExecutionPolicy Bypass -File scripts/cargo-command.ps1 check --manifest-path apps/desktop/src-tauri/Cargo.toml",
+    "rust:fmt": "powershell -ExecutionPolicy Bypass -File scripts/cargo-command.ps1 fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check",
+    "rust:clippy": "powershell -ExecutionPolicy Bypass -File scripts/cargo-command.ps1 clippy --manifest-path apps/desktop/src-tauri/Cargo.toml -- -D warnings",
+    "rust:test": "powershell -ExecutionPolicy Bypass -File scripts/cargo-command.ps1 test --manifest-path apps/desktop/src-tauri/Cargo.toml",
+    "verify": "powershell -ExecutionPolicy Bypass -File scripts/verify.ps1",
+    "desktop:build": "powershell -ExecutionPolicy Bypass -File scripts/build-desktop.ps1",
+    "desktop:smoke": "powershell -ExecutionPolicy Bypass -File scripts/smoke-installed.ps1"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.8.0"
+  }
+}

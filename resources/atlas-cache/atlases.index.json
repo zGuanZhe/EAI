@@ -1,0 +1,137 @@
+[
+  {
+    "id": "A",
+    "slug": "data-corpus",
+    "title": "A. Embodied AI Data Corpus Atlas",
+    "title_cn": "数据语料库",
+    "route_count": 8,
+    "paper_count": 79,
+    "relation_count": 102
+  },
+  {
+    "id": "B",
+    "slug": "benchmark-eval",
+    "title": "B. Embodied AI Benchmark Evaluation Atlas",
+    "title_cn": "基准评测",
+    "route_count": 8,
+    "paper_count": 48,
+    "relation_count": 77
+  },
+  {
+    "id": "C",
+    "slug": "simulation-synthetic",
+    "title": "C. Simulation / Synthetic Data Engine Atlas",
+    "title_cn": "仿真合成引擎",
+    "route_count": 7,
+    "paper_count": 53,
+    "relation_count": 42
+  },
+  {
+    "id": "D",
+    "slug": "representation-latent",
+    "title": "D. Embodied Representation / Latent State",
+    "title_cn": "具身表征与隐状态",
+    "route_count": 7,
+    "paper_count": 46,
+    "relation_count": 45
+  },
+  {
+    "id": "E",
+    "slug": "action-tokenization",
+    "title": "E. Action Representation / Tokenization Atlas",
+    "title_cn": "动作表示与Token化",
+    "route_count": 10,
+    "paper_count": 38,
+    "relation_count": 94
+  },
+  {
+    "id": "F",
+    "slug": "policy-learning",
+    "title": "F. Policy Learning / Generative Control",
+    "title_cn": "策略学习与生成控制",
+    "route_count": 7,
+    "paper_count": 57,
+    "relation_count": 189
+  },
+  {
+    "id": "G",
+    "slug": "vla-rfm",
+    "title": "G. VLA / RFM Research Atlas",
+    "title_cn": "VLA与机器人基础模型",
+    "route_count": 9,
+    "paper_count": 91,
+    "relation_count": 166
+  },
+  {
+    "id": "H",
+    "slug": "world-model",
+    "title": "H. World Model / Predictive Learning",
+    "title_cn": "世界模型与预测学习",
+    "route_count": 7,
+    "paper_count": 119,
+    "relation_count": 218
+  },
+  {
+    "id": "I",
+    "slug": "rl-posttraining",
+    "title": "I. RL Posttraining Research Atlas",
+    "title_cn": "强化学习后训练",
+    "route_count": 7,
+    "paper_count": 43,
+    "relation_count": 77
+  },
+  {
+    "id": "J",
+    "slug": "cross-embodiment",
+    "title": "J. Cross Embodiment Research Atlas",
+    "title_cn": "跨具身研究",
+    "route_count": 8,
+    "paper_count": 37,
+    "relation_count": 69
+  },
+  {
+    "id": "K",
+    "slug": "task-skill-curriculum",
+    "title": "K. Task / Skill Curriculum Atlas",
+    "title_cn": "任务与技能课程",
+    "route_count": 6,
+    "paper_count": 42,
+    "relation_count": 117
+  },
+  {
+    "id": "L",
+    "slug": "efficient-deployable",
+    "title": "L. Efficient Deployable Embodied Models Atlas",
+    "title_cn": "高效可部署模型",
+    "route_count": 7,
+    "paper_count": 33,
+    "relation_count": 126
+  },
+  {
+    "id": "M",
+    "slug": "safety-risk-deployment",
+    "title": "M. Embodied AI Safety / Risk / Deployment",
+    "title_cn": "安全风险与部署",
+    "route_count": 7,
+    "paper_count": 42,
+    "relation_count": 0
+  },
+  {
+    "id": "N",
+    "slug": "reasoning-planning-memory",
+    "title": "N. Reasoning / Planning / Memory Atlas",
+    "title_cn": "推理规划与记忆",
+    "route_count": 8,
+    "paper_count": 62,
+    "relation_count": 48
+  },
+  {
+    "id": "WAM",
+    "slug": "world-abstraction-model",
+    "title": "WAM Research Atlas",
+    "title_cn": "世界抽象模型",
+    "route_count": 7,
+    "paper_count": 112,
+    "relation_count": 186
+  }
+]

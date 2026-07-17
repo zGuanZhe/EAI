@@ -1,0 +1,11 @@
+.context-drawer.ui-drawer { z-index: 72; display: grid; background: rgba(251,253,252,.99); border-left-color: rgba(17,136,102,.18); box-shadow: -12px 0 32px rgba(31,41,55,.06); }
+.context-drawer .ui-drawer-body { min-height: 0; padding: 0; overflow: hidden; }
+.context-drawer-scroll { height: 100%; min-height: 0; padding: 14px 16px 30px; overflow-y: auto; }
+.context-materials > header { padding-bottom: 12px; }
+.context-materials > header > span { color: var(--green); }
+.context-materials > section { padding: 12px 0; border-top: 1px solid var(--line); }
+.context-material-row { border-radius: 8px; }
+.context-material-row.long-term { background: var(--green-soft); }
+.context-material-row:not(.long-term) { background: var(--blue-soft); }
+.context-advanced-panel, .context-material-advanced { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.context-advanced-panel summary, .context-material-advanced summary { color: var(--muted); font-size: 11px; font-weight: 700; }

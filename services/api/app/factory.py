@@ -1,0 +1,38 @@
+from __future__ import annotations
+
+import hmac
+import os
+
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+
+
+class DesktopSessionMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        expected = os.environ.get("EAI_DESKTOP_SESSION_TOKEN", "")
+        if expected and request.method != "OPTIONS" and request.url.path.startswith("/api/vnext"):
+            actual = request.headers.get("X-EAI-Session", "")
+            if not hmac.compare_digest(actual, expected):
+                return JSONResponse(status_code=401, content={"detail": "桌面会话无效，请重新启动应用。"})
+        return await call_next(request)
+
+
+def create_app() -> FastAPI:
+    app = FastAPI(title="EAI Desktop Service", version="0.2.0")
+    app.add_middleware(DesktopSessionMiddleware)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://127.0.0.1:5173",
+            "http://localhost:5173",
+            "http://tauri.localhost",
+            "tauri://localhost",
+            "https://tauri.localhost",
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    return app
