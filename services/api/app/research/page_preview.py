@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import threading
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from pathlib import Path
 
 import fitz
@@ -12,13 +14,38 @@ from .store import ResearchStore
 
 MAX_PIXELS = 16_000_000
 MAX_CACHE_BYTES = 512 * 1024 * 1024
-RENDER_LIMIT = threading.BoundedSemaphore(2)
+DEFAULT_RENDER_TIMEOUT_SECONDS = 8.0
+
+
+def _render_pdf_page(path: Path, page_number: int, dpi: int) -> bytes:
+    with fitz.open(path) as pdf:
+        page = pdf.load_page(page_number - 1)
+        scale = dpi / 72
+        pixels = int(page.rect.width * scale) * int(page.rect.height * scale)
+        if pixels > MAX_PIXELS:
+            raise ValueError("rendered page exceeds pixel budget")
+        return page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False).tobytes("png")
 
 
 class PagePreviewService:
-    def __init__(self, store: ResearchStore):
+    def __init__(
+        self,
+        store: ResearchStore,
+        *,
+        render_timeout_seconds: float = DEFAULT_RENDER_TIMEOUT_SECONDS,
+        render_page: Callable[[Path, int, int], bytes] | None = None,
+    ):
         self.store = store
         self.cache_dir = store.index_dir / "page-previews"
+        self.render_timeout_seconds = max(0.01, float(render_timeout_seconds))
+        self._render_page = render_page or _render_pdf_page
+        self._render_slots = threading.BoundedSemaphore(2)
+        self._render_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="eai-pdf-page")
+        self._closed = False
+
+    def close(self) -> None:
+        self._closed = True
+        self._render_executor.shutdown(wait=False, cancel_futures=True)
 
     def _document_path(self, document: dict) -> Path:
         path = Path(document["blob_path"]).resolve()
@@ -84,24 +111,34 @@ class PagePreviewService:
         if target.exists():
             target.touch()
             return target.read_bytes(), cache_key
-        if not RENDER_LIMIT.acquire(timeout=2):
+        if self._closed:
+            raise RuntimeError("page renderer is closed")
+        if not self._render_slots.acquire(timeout=2):
             raise TimeoutError("page renderer is busy")
         try:
-            with fitz.open(path) as pdf:
-                page = pdf.load_page(page_number - 1)
-                scale = dpi / 72
-                pixels = int(page.rect.width * scale) * int(page.rect.height * scale)
-                if pixels > MAX_PIXELS:
-                    raise ValueError("rendered page exceeds pixel budget")
-                payload = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False).tobytes("png")
+            future = self._render_executor.submit(self._render_page, path, page_number, dpi)
+        except Exception:
+            self._render_slots.release()
+            raise
+        future.add_done_callback(lambda _future: self._render_slots.release())
+        try:
+            payload = future.result(timeout=self.render_timeout_seconds)
+        except FutureTimeoutError as exc:
+            future.cancel()
+            raise TimeoutError("page render exceeded time budget") from exc
+
+        # Only the request thread writes the cache. A timed-out worker can finish,
+        # but its late result is isolated and cannot become a visible projection.
+        temporary = target.with_suffix(".tmp")
+        try:
             target.parent.mkdir(parents=True, exist_ok=True)
-            temporary = target.with_suffix(".tmp")
             temporary.write_bytes(payload)
             temporary.replace(target)
             self._evict_cache()
             return payload, cache_key
-        finally:
-            RENDER_LIMIT.release()
+        except OSError:
+            temporary.unlink(missing_ok=True)
+            raise
 
     def _evict_cache(self) -> None:
         files = sorted(self.cache_dir.rglob("*.png"), key=lambda item: item.stat().st_mtime)

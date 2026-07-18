@@ -26,6 +26,7 @@ from app.agent_v2.routing import fallback_service_decision, route_turn
 from app.agent_v2.sandbox import SandboxUnavailable, docker_arguments, run_docker_command
 from app.agent_v2.sources import SourceService
 from app.agent_v2.store import RuntimeStore
+from tests.routing_eval_cases import ROUTING_EVAL_CASES
 
 
 class AgentRuntimeV2Test(unittest.TestCase):
@@ -1006,28 +1007,52 @@ class AgentRuntimeV2Test(unittest.TestCase):
         self.assertNotIn("powershell", args)
 
     def test_service_routing_eval_reaches_95_percent(self):
-        cases: list[tuple[str, str]] = []
-        greetings = ["你好", "您好", "hello", "hi", "在吗", "谢谢", "早上好", "晚上好", "hey", "你好呀"]
-        evidence = ["检索最新论文", "搜索相关证据", "这个方向有哪些文献", "查一下 arXiv 进展", "研究这个问题", "找 DOI", "论文证据是什么", "最新进展如何", "检索 VLA 论文", "搜索研究工作"]
-        reading = ["阅读这篇论文", "分析这个 PDF", "这份文档第几节说明方法", "阅读全文", "总结这篇论文", "检查 PDF 实验", "读一下这份文档", "论文全文有什么局限", "分析附件文档", "从 PDF 找结论"]
-        synthesis = ["比较两条研究路线", "形成证据链", "综合这些论文", "构建 Canvas 论证", "形成假设", "比较方法差异", "整理研究路线", "论证这个结论", "综合不同证据", "Canvas 结构是否完整"]
-        operations = ["修改线程目标", "更新论文卡", "创建实验", "保存这条判断", "加入上下文", "重命名项目", "记住这个偏好", "写入 Canvas", "删除候选", "更新对象记忆"]
-        execution = ["运行代码", "执行命令 python -V", "复现实验", "跑一下脚本", "run command pytest", "用 docker 执行", "执行命令", "运行这个程序", "跑一下测试", "执行 bash 命令"]
-        for _ in range(2):
-            cases += [(text, "conversation") for text in greetings]
-            cases += [(text, "evidence_research") for text in evidence]
-            cases += [(text, "document_reading") for text in reading]
-            cases += [(text, "synthesis") for text in synthesis]
-            cases += [(text, "workspace_operation") for text in operations]
-        cases += [(text, "sandbox_execution") for text in execution]
-        self.assertEqual(len(cases), 110)
-        mismatches = [
-            {"text": text, "expected": expected, "actual": fallback_service_decision(AgentTurnRequest(message=text)).service}
-            for text, expected in cases
-            if fallback_service_decision(AgentTurnRequest(message=text)).service != expected
-        ]
-        correct = len(cases) - len(mismatches)
-        self.assertGreaterEqual(correct / len(cases), 0.95, json.dumps({"correct": correct, "total": len(cases), "mismatches": mismatches}, ensure_ascii=False))
+        self.assertGreaterEqual(len(ROUTING_EVAL_CASES), 120)
+        identities = {
+            json.dumps(case, ensure_ascii=False, sort_keys=True)
+            for case in ROUTING_EVAL_CASES
+        }
+        self.assertEqual(len(identities), len(ROUTING_EVAL_CASES), "routing eval cases must be unique")
+        self.assertEqual(
+            {case["expected_service"] for case in ROUTING_EVAL_CASES},
+            {"conversation", "evidence_research", "document_reading", "synthesis", "workspace_operation", "sandbox_execution", "research_campaign"},
+        )
+        self.assertEqual(
+            {case["source_policy"] for case in ROUTING_EVAL_CASES if "source_policy" in case},
+            {"none", "atlas_only", "local_only", "external_only", "local_and_external"},
+        )
+
+        mismatches = []
+        hard_constraint_mismatches = []
+        for case in ROUTING_EVAL_CASES:
+            request = AgentTurnRequest.model_validate({
+                key: case[key]
+                for key in ["message", "intent_override", "source_policy", "turn_attachments"]
+                if key in case
+            })
+            decision = route_turn(request)
+            actual = {
+                "service": decision.service,
+                "source_policy": decision.source_policy,
+                "requires_clarification": decision.requires_clarification,
+            }
+            expected_ok = decision.service == case["expected_service"]
+            if "expected_source_policy" in case:
+                expected_ok = expected_ok and decision.source_policy == case["expected_source_policy"]
+            if "expected_clarification" in case:
+                expected_ok = expected_ok and decision.requires_clarification == case["expected_clarification"]
+            if not expected_ok:
+                mismatch = {"case": case, "actual": actual}
+                mismatches.append(mismatch)
+                if case.get("intent_override", "auto") != "auto" or "source_policy" in case:
+                    hard_constraint_mismatches.append(mismatch)
+
+        correct = len(ROUTING_EVAL_CASES) - len(mismatches)
+        self.assertEqual(hard_constraint_mismatches, [], json.dumps(hard_constraint_mismatches, ensure_ascii=False))
+        self.assertGreaterEqual(
+            correct / len(ROUTING_EVAL_CASES), 0.95,
+            json.dumps({"correct": correct, "total": len(ROUTING_EVAL_CASES), "mismatches": mismatches}, ensure_ascii=False),
+        )
 
 
 if __name__ == "__main__":

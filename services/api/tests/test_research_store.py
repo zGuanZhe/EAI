@@ -195,6 +195,22 @@ class ResearchStoreTest(unittest.TestCase):
         self.assertTrue(locator["rects"])
         image, _ = preview.render(document["id"], 1, 144)
         self.assertTrue(image.startswith(b"\x89PNG"))
+        cached_before = set(preview.cache_dir.rglob("*.png"))
+
+        def slow_renderer(_path: Path, _page_number: int, _dpi: int) -> bytes:
+            time.sleep(0.06)
+            return b"\x89PNG-late-result"
+
+        timed_preview = PagePreviewService(
+            self.store, render_timeout_seconds=0.01, render_page=slow_renderer,
+        )
+        try:
+            with self.assertRaisesRegex(TimeoutError, "time budget"):
+                timed_preview.render(document["id"], 1, 145)
+            time.sleep(0.08)
+            self.assertEqual(set(preview.cache_dir.rglob("*.png")), cached_before)
+        finally:
+            timed_preview.close()
         with self.assertRaisesRegex(ValueError, "DPI"):
             preview.render(document["id"], 1, 181)
         with self.assertRaisesRegex(ValueError, "outside"):

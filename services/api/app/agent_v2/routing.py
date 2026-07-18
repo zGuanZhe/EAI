@@ -41,6 +41,23 @@ def _clean_text(value: Any, limit: int = 600) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip()[:limit]
 
 
+def _has_action_intent(text: str, markers: list[str]) -> bool:
+    negation = re.compile(
+        r"(?:不要|不必|无需|不需要|别|禁止|仅解释|只解释|如何|怎么|do not|don't|never|without|how to|explain)\s*.{0,10}$",
+        re.IGNORECASE,
+    )
+    for marker in markers:
+        start = 0
+        while True:
+            index = text.find(marker, start)
+            if index < 0:
+                break
+            if not negation.search(text[max(0, index - 28):index]):
+                return True
+            start = index + len(marker)
+    return False
+
+
 def parse_service_decision(raw: str, request: AgentTurnRequest) -> ServiceDecision | None:
     candidates = re.findall(r"```(?:json)?\s*([\s\S]*?)```", raw or "")
     candidates.append((raw or "").strip())
@@ -89,17 +106,30 @@ def fallback_service_decision(request: AgentTurnRequest) -> ServiceDecision:
         return ServiceDecision(service="conversation", objective=text, depth="quick", source_policy="none", confidence=0.99, reason="普通交流无需检索。")
 
     attachment_types = {str(item.get("type") or "").lower() for item in request.turn_attachments if isinstance(item, dict)}
-    if any(word in lower for word in ["campaign", "实验树", "研究想法", "实验分支", "最佳分支", "审稿意见", "论文稿件", "研究包"]):
+    if any(word in lower for word in [
+        "campaign", "实验树", "研究想法", "实验分支", "最佳分支", "审稿意见", "三角色审稿", "论文稿件", "研究包", "发布包",
+        "experiment tree", "experiment branch", "research idea", "manuscript", "peer review", "release package",
+    ]):
         return ServiceDecision(
             service="research_campaign", objective=text, depth="deep",
             source_policy=request.source_policy or "local_and_external",
             requested_outputs=["campaign_state", "evidence_set"], confidence=0.88,
             reason="问题指向研究 Campaign、实验分支或论文闭环。",
         )
-    if any(word in lower for word in ["运行代码", "执行命令", "复现实验", "跑一下", "run command", "docker"]) or re.search(r"(?:运行|执行).{0,12}(?:程序|脚本|命令|代码|测试)", lower):
+    execution_markers = [
+        "运行代码", "执行命令", "复现实验", "跑一下", "run command", "run code", "run this code",
+        "execute", "reproduce the experiment", "launch the test", "docker",
+    ]
+    execution_pattern = re.search(r"(?:运行|执行).{0,12}(?:程序|脚本|命令|代码|测试)", lower)
+    if _has_action_intent(lower, execution_markers) or (execution_pattern and _has_action_intent(lower, [execution_pattern.group(0)])):
         return ServiceDecision(service="sandbox_execution", objective=text, depth="standard", source_policy="local_only", requested_outputs=["command_output"], confidence=0.86, reason="问题要求执行代码或命令。")
-    if any(word in lower for word in ["修改", "更新", "创建", "删除", "加入", "长期资料", "保存", "记住", "写入", "重命名"]):
-        vague_target = len(compact) <= 10 and not request.turn_attachments and any(word in lower for word in ["修改", "更新", "删除", "保存", "加入"])
+    operation_markers = [
+        "修改", "更新", "创建", "删除", "加入", "长期资料", "保存", "记住", "写入", "重命名",
+        "save", "remember", "rename", "add this", "add to", "update", "create", "delete", "write to",
+    ]
+    if _has_action_intent(lower, operation_markers):
+        vague_markers = ["修改", "更新", "删除", "保存", "加入", "save", "update", "delete", "add"]
+        vague_target = len(compact) <= 14 and not request.turn_attachments and any(word in lower for word in vague_markers)
         if vague_target:
             return ServiceDecision(
                 service="workspace_operation", objective=text, depth="quick", source_policy="local_only",
@@ -108,11 +138,20 @@ def fallback_service_decision(request: AgentTurnRequest) -> ServiceDecision:
                 reason="操作对象或目标值不明确。",
             )
         return ServiceDecision(service="workspace_operation", objective=text, depth="standard", source_policy="local_only", requested_outputs=["operation_preview"], confidence=0.78, reason="问题要求操作工作区数据。")
-    if attachment_types.intersection({"pdf", "document", "file"}) or any(word in lower for word in ["全文", "这篇论文", "这份文档", "附件文档", "第几节", "pdf"]):
+    if attachment_types.intersection({"pdf", "document", "file"}) or any(word in lower for word in [
+        "全文", "这篇论文", "这份文档", "附件文档", "第几节", "pdf", "attached paper", "attached document",
+        "full text", "which section", "read page",
+    ]):
         return ServiceDecision(service="document_reading", objective=text, depth="standard", source_policy=request.source_policy or "local_and_external", requested_outputs=["document_analysis"], confidence=0.84, reason="问题指向具体文档或全文。")
-    if any(word in lower for word in ["比较", "综合", "论证", "形成假设", "证据链", "canvas", "研究路线"]):
+    if any(word in lower for word in [
+        "比较", "综合", "论证", "形成假设", "证据链", "canvas", "研究路线",
+        "compare", "synthesize", "hypothesis", "evidence chain", "organize this",
+    ]):
         return ServiceDecision(service="synthesis", objective=text, depth="deep", source_policy=request.source_policy or "local_and_external", requested_outputs=["evidence_set", "canvas_draft"], confidence=0.78, reason="问题需要跨来源综合或论证。")
-    if any(word in lower for word in ["论文", "证据", "检索", "搜索", "最新", "进展", "研究", "文献", "arxiv", "doi"]):
+    if any(word in lower for word in [
+        "论文", "证据", "检索", "搜索", "最新", "进展", "研究", "文献", "arxiv", "doi",
+        "paper", "papers", "evidence", "literature", "state of the art", "external sources",
+    ]):
         return ServiceDecision(service="evidence_research", objective=text, depth="deep", source_policy=request.source_policy or "local_and_external", requested_outputs=["evidence_set", "research_note"], confidence=0.76, reason="问题具有明确研究和证据需求。")
     return ServiceDecision(service="conversation", objective=text, depth="quick", source_policy="none", confidence=0.58, reason="无法可靠识别工具需求，安全回到普通对话。")
 

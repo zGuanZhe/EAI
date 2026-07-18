@@ -68,6 +68,7 @@ from .services.workspace import WorkspaceService
 from .research.context import build_research_state, evidence_bundle_to_sources, search_for_agent
 from .research.documents import import_document as import_research_document
 from .research.enrichment import KnowledgeEnrichmentService
+from .research.page_preview import PagePreviewService
 from .research.router import create_research_router
 from .research.store import ResearchStore
 
@@ -120,6 +121,10 @@ def get_knowledge_enrichment() -> KnowledgeEnrichmentService:
             and os.environ.get("EAI_DISABLE_AUTO_KNOWLEDGE_SYNC") != "1"
         ),
     )
+
+
+def get_page_preview_service() -> PagePreviewService:
+    return APP_SERVICES.page_preview(get_research_store())
 
 
 def reset_app_services() -> None:
@@ -5757,5 +5762,5 @@ def secrets_status() -> dict[str, Any]:
     return safe_secret_status(data, path, bool(os.environ.get("OPENAI_API_KEY")))
 
 
-app.include_router(create_research_router(get_research_store, get_knowledge_enrichment))
+app.include_router(create_research_router(get_research_store, get_knowledge_enrichment, get_page_preview_service))
 app.include_router(create_campaign_router(get_campaign_service))

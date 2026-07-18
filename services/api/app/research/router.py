@@ -24,6 +24,7 @@ from ..services.projection import ProjectionService
 def create_research_router(
     get_store: Callable[[], ResearchStore],
     get_enrichment: Callable[[], KnowledgeEnrichmentService],
+    get_page_preview: Callable[[], PagePreviewService],
 ) -> APIRouter:
     router = APIRouter(prefix="/api/vnext/knowledge", tags=["knowledge"])
 
@@ -80,7 +81,7 @@ def create_research_router(
     @router.get("/evidence/{evidence_id}/locator")
     def evidence_locator(evidence_id: str):
         try:
-            return PagePreviewService(get_store()).locator(evidence_id)
+            return get_page_preview().locator(evidence_id)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except (ValueError, FileNotFoundError) as exc:
@@ -89,7 +90,7 @@ def create_research_router(
     @router.get("/documents/{document_id}/pages/{page_number}/image")
     def document_page_image(document_id: str, page_number: int, dpi: int = Query(default=144, ge=72, le=180)):
         try:
-            payload, etag = PagePreviewService(get_store()).render(document_id, page_number, dpi)
+            payload, etag = get_page_preview().render(document_id, page_number, dpi)
             return Response(
                 payload, media_type="image/png",
                 headers={"ETag": etag, "Cache-Control": "private, max-age=86400"},

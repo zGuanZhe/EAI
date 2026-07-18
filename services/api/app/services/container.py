@@ -7,6 +7,7 @@ from pathlib import Path
 from ..agent_v2.runtime import AgentRuntimeV2
 from ..campaign.service import CampaignService
 from ..research.enrichment import KnowledgeEnrichmentService
+from ..research.page_preview import PagePreviewService
 from ..research.store import ResearchStore
 from .projection import ProjectionService
 
@@ -18,6 +19,7 @@ class AppServices:
         self._runtime_signature: tuple[Path, bool, int] | None = None
         self._research_store: ResearchStore | None = None
         self._enrichment: KnowledgeEnrichmentService | None = None
+        self._page_preview: PagePreviewService | None = None
         self._agent_runtime: AgentRuntimeV2 | None = None
         self._campaign: CampaignService | None = None
 
@@ -50,6 +52,14 @@ class AppServices:
 
     def projection(self, store: ResearchStore) -> ProjectionService:
         return ProjectionService(store, store.personal_dir)
+
+    def page_preview(self, store: ResearchStore) -> PagePreviewService:
+        with self._lock:
+            if self._page_preview is None or self._page_preview.store is not store:
+                if self._page_preview is not None:
+                    self._page_preview.close()
+                self._page_preview = PagePreviewService(store)
+            return self._page_preview
 
     def agent_runtime(
         self,
@@ -95,6 +105,9 @@ class AppServices:
     def _close_locked(self) -> None:
         self._close_runtime_locked()
         self._enrichment = None
+        if self._page_preview is not None:
+            self._page_preview.close()
+            self._page_preview = None
         if self._research_store is not None:
             self._research_store.close()
             self._research_store = None
