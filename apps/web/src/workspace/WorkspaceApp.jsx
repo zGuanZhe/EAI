@@ -54,6 +54,7 @@ import { RunCenter } from "../features/tools/RunCenter.jsx";
 import { AgentApprovalInspector } from "../features/inspector/AgentApprovalInspector.jsx";
 import { ConfirmDialog, RightRail } from "../features/inspector/RightRail.jsx";
 import { WorkspaceCreateDialog } from "../features/workspace/WorkspaceCreateDialog.jsx";
+import { useWorkspaceServerState } from "../features/workspace/useWorkspaceServerState.js";
 import { InlineNotice } from "../components/ui/index.jsx";
 import { useNotifications } from "../app/Notifications.jsx";
 import { Sidebar } from "../layout/Sidebar.jsx";
@@ -205,14 +206,16 @@ export function App() {
   const { announce } = useNotifications();
   const [workspaceState, dispatchWorkspace] = useReducer(workspaceReducer, initialWorkspaceState);
   const { surface, rail, railOpen, sidebarOpen, toolsPage } = workspaceState;
-  const [projects, setProjects] = useState([]);
   const [activeProjectId, setActiveProjectId] = useState("unfiled");
-  const [threads, setThreads] = useState([]);
   const [thread, setThread] = useState(null);
-  const [atlases, setAtlases] = useState([]);
-  const [bundle, setBundle] = useState(null);
-  const [atlasUpdates, setAtlasUpdates] = useState(null);
-  const [objectMemories, setObjectMemories] = useState([]);
+  const {
+    projects, setProjects, threads, setThreads, atlases, bundle, atlasUpdates, setAtlasUpdates,
+    objectMemories, setObjectMemories, secrets, systemInfo, knowledgeStatus, researchTemplates,
+    bootstrapReady, bootstrapError, refreshThreads, refreshProjects, refreshKnowledgeStatus,
+    refreshRuntimeState,
+    refreshBundle: loadBundle, refreshObjectMemories: loadObjectMemories,
+    refreshAtlasUpdates: loadAtlasUpdates
+  } = useWorkspaceServerState(thread?.active_atlas_id);
   const [detail, setDetail] = useState(null);
   const [paperOverlay, setPaperOverlay] = useState(null);
   const [atlasControls, setAtlasControls] = useState(null);
@@ -223,13 +226,9 @@ export function App() {
   const [pasteText, setPasteText] = useState("");
   const [resultPreview, setResultPreview] = useState(null);
   const [status, setStatus] = useState("就绪");
-  const [secrets, setSecrets] = useState({ configured: false, providers: [] });
-  const [systemInfo, setSystemInfo] = useState(null);
-  const [knowledgeStatus, setKnowledgeStatus] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [contextDrawerOpen, setContextDrawerOpen] = useState(false);
   const [pathDraft, setPathDraft] = useState([]);
-  const [researchTemplates, setResearchTemplates] = useState([]);
   const [taskPackPreview, setTaskPackPreview] = useState(null);
   const [atlasUpdatePreview, setAtlasUpdatePreview] = useState(null);
   const [atlasUpdatePaste, setAtlasUpdatePaste] = useState("");
@@ -261,10 +260,7 @@ export function App() {
     agentMode, setAgentMode, attachments: turnAttachments,
     replaceAttachments: replaceTurnAttachments, enabled: !researchReadOnly,
   });
-  const bundleCacheRef = useRef(new Map());
-  const bundleRequestRef = useRef(0);
-  const memoryRequestRef = useRef(0);
-  const updateRequestRef = useRef(0);
+  const bootstrapStartedRef = useRef(false);
   const threadRequestRef = useRef(0);
   const paperKnowledgeRequestRef = useRef(0);
 
@@ -324,8 +320,32 @@ export function App() {
   }
 
   useEffect(() => {
-    bootstrap();
-  }, []);
+    if (!bootstrapReady || bootstrapStartedRef.current) return;
+    bootstrapStartedRef.current = true;
+    setStatus("正在加载 vNext 工作区");
+    const start = async () => {
+      if (threads.length) {
+        setActiveProjectId(threads[0].project_id || "unfiled");
+        await openThread(threads[0].id, "home");
+      } else {
+        setThread(null);
+        if (projects.length) setActiveProjectId(projects[0].id);
+        setCreateDialog({ kind: projects.length ? "thread" : "project", required: true });
+      }
+      setBootstrapped(true);
+      setStatus("就绪");
+    };
+    start().catch((error) => {
+      setBootstrapped(true);
+      setStatus(`加载工作区失败：${error.message}`);
+    });
+  }, [bootstrapReady]);
+
+  useEffect(() => {
+    if (!bootstrapError) return;
+    setBootstrapped(true);
+    setStatus(`加载工作区失败：${bootstrapError.message}`);
+  }, [bootstrapError]);
 
   useEffect(() => {
     const narrow = window.matchMedia("(max-width: 899px)");
@@ -342,61 +362,6 @@ export function App() {
       wide.removeEventListener("change", syncSidebar);
     };
   }, []);
-
-  useEffect(() => {
-    if (thread?.active_atlas_id) {
-      loadBundle(thread.active_atlas_id);
-      loadObjectMemories(thread.active_atlas_id);
-      loadAtlasUpdates(thread.active_atlas_id);
-    }
-  }, [thread?.active_atlas_id]);
-
-  useEffect(() => {
-    if (!knowledgeStatus?.active_jobs?.length) return undefined;
-    const timer = window.setInterval(() => refreshKnowledgeStatus().catch(() => {}), 1200);
-    return () => window.clearInterval(timer);
-  }, [knowledgeStatus?.active_jobs?.length]);
-
-  async function bootstrap() {
-    setStatus("正在加载 vNext 工作区");
-    let [atlasList, projectList, threadList, secretStatus, templateList, info, knowledge] = await Promise.all([
-      api("/atlases"),
-      api("/projects"),
-      api("/threads"),
-      api("/secrets/status"),
-      api("/research-templates"),
-      api("/system/info").catch(() => null),
-      api("/knowledge/status").catch(() => null)
-    ]);
-    setAtlases(atlasList);
-    setProjects(projectList);
-    setSecrets(secretStatus);
-    setSystemInfo(info);
-    setKnowledgeStatus(knowledge);
-    setResearchTemplates(templateList);
-    if (threadList.length) {
-      setThreads(threadList);
-      setActiveProjectId(threadList[0].project_id || "unfiled");
-      await openThread(threadList[0].id, "home");
-    } else {
-      setThreads([]);
-      setThread(null);
-      if (projectList.length) setActiveProjectId(projectList[0].id);
-      setCreateDialog({ kind: projectList.length ? "thread" : "project", required: true });
-    }
-    setBootstrapped(true);
-    setStatus("就绪");
-  }
-
-  async function refreshThreads() {
-    const list = await api("/threads");
-    setThreads(list);
-  }
-
-  async function refreshProjects() {
-    const list = await api("/projects");
-    setProjects(list);
-  }
 
   async function openThread(id, nextSurface = null) {
     const requestId = ++threadRequestRef.current;
@@ -551,12 +516,6 @@ export function App() {
     return updated;
   }
 
-  async function refreshKnowledgeStatus() {
-    const next = await api("/knowledge/status");
-    setKnowledgeStatus(next);
-    return next;
-  }
-
   async function startKnowledgeSync(scope = "metadata") {
     const job = await api("/knowledge/sync", {
       method: "POST",
@@ -669,44 +628,20 @@ export function App() {
     }
   }
 
-  async function loadBundle(atlasId) {
-    const requestId = ++bundleRequestRef.current;
-    const cached = bundleCacheRef.current.get(atlasId);
-    if (cached) setBundle(cached);
-    const data = await api(`/atlases/${atlasId}/bundle`);
-    if (requestId !== bundleRequestRef.current) return;
-    bundleCacheRef.current.set(atlasId, data);
-    setBundle(data);
-  }
-
-  async function loadObjectMemories(atlasId) {
-    const requestId = ++memoryRequestRef.current;
-    const data = await api(`/object-memory?atlas_id=${encodeURIComponent(atlasId)}`);
-    if (requestId !== memoryRequestRef.current) return;
-    setObjectMemories(data);
-  }
-
-  async function loadAtlasUpdates(atlasId) {
-    const requestId = ++updateRequestRef.current;
-    const data = await api(`/atlas-updates/${encodeURIComponent(atlasId)}`);
-    if (requestId !== updateRequestRef.current) return;
-    setAtlasUpdates(data);
-  }
-
   async function saveObjectMemory(ref, memory) {
     if (!ref?.atlasId || !ref?.type || !ref?.id) return;
     const updated = await api(`/object-memory/${ref.atlasId}/${ref.type}/${encodeURIComponent(ref.id)}`, {
       method: "PUT",
       body: JSON.stringify(memory)
     });
-    setObjectMemories((items) => {
+    setObjectMemories((items = []) => {
       const key = objectMemoryKey(ref.type, ref.id);
       const next = items.filter((item) => {
         const itemRef = item.object_ref || {};
         return objectMemoryKey(itemRef.object_type, itemRef.object_id) !== key;
       });
       return [updated, ...next];
-    });
+    }, ref.atlasId);
     setStatus("对象记忆已保存");
     return updated;
   }
@@ -1875,6 +1810,7 @@ export function App() {
         onClose={() => setSettingsOpen(false)}
         systemInfo={systemInfo}
         secrets={secrets}
+        onRuntimeRestarted={refreshRuntimeState}
       />
       <PaperReadingOverlay
         detail={paperOverlay}

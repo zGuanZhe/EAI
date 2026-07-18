@@ -9,7 +9,7 @@ async function invoke(command, payload) {
   return module.invoke(command, payload);
 }
 
-export function DesktopSettings({ open, onClose, systemInfo, secrets }) {
+export function DesktopSettings({ open, onClose, systemInfo, secrets, onRuntimeRestarted }) {
   const [provider, setProvider] = useState("openrouter");
   const [secret, setSecret] = useState("");
   const [status, setStatus] = useState("");
@@ -18,6 +18,7 @@ export function DesktopSettings({ open, onClose, systemInfo, secrets }) {
     setStatus("正在重启本地服务");
     await invoke("restart_backend");
     resetRuntimeInfo();
+    await onRuntimeRestarted?.();
     setStatus("模型通道已更新");
   };
   const save = async () => {
