@@ -747,46 +747,131 @@ class ResearchStore:
         *,
         projection_target: str | None = None,
     ) -> dict[str, Any]:
+        with self.transaction() as connection:
+            self._save_record_in_transaction(connection, kind, record_id, payload, projection_target)
+        return payload
+
+    def apply_record_batch(self, mutations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Apply canonical record mutations and their projection outbox rows atomically.
+
+        Each mutation must include kind, record_id, payload (or None for delete),
+        projection_target, and expected_payload. The expected payload is checked
+        after BEGIN IMMEDIATE so concurrent changes fail before any write occurs.
+        JSON projection is intentionally not performed in this transaction.
+        """
+        normalized: list[dict[str, Any]] = []
+        seen: set[tuple[str, str]] = set()
+        for mutation in mutations:
+            kind = str(mutation.get("kind") or "")
+            record_id = str(mutation.get("record_id") or "")
+            key = (kind, record_id)
+            if not kind or not record_id:
+                raise ValueError("record mutation requires kind and record_id")
+            if key in seen:
+                raise ValueError(f"duplicate record mutation: {kind}:{record_id}")
+            if "expected_payload" not in mutation:
+                raise ValueError("record mutation requires expected_payload")
+            seen.add(key)
+            normalized.append({
+                "kind": kind,
+                "record_id": record_id,
+                "payload": mutation.get("payload"),
+                "expected_payload": mutation.get("expected_payload"),
+                "projection_target": mutation.get("projection_target"),
+            })
+
+        results: list[dict[str, Any]] = []
+        with self.transaction() as connection:
+            for mutation in normalized:
+                row = connection.execute(
+                    "SELECT payload FROM research_records WHERE kind=? AND id=?",
+                    (mutation["kind"], mutation["record_id"]),
+                ).fetchone()
+                current_payload = json.loads(row["payload"]) if row else None
+                if current_payload != mutation["expected_payload"]:
+                    raise RevisionConflictError({
+                        "message": "操作目标发生变化",
+                        "record_kind": mutation["kind"],
+                        "record_id": mutation["record_id"],
+                        "expected": mutation["expected_payload"],
+                        "current": current_payload,
+                    })
+
+            for mutation in normalized:
+                if mutation["payload"] is None:
+                    revision = self._delete_record_in_transaction(
+                        connection,
+                        mutation["kind"],
+                        mutation["record_id"],
+                        mutation["projection_target"],
+                    )
+                    operation = "delete"
+                else:
+                    revision = self._save_record_in_transaction(
+                        connection,
+                        mutation["kind"],
+                        mutation["record_id"],
+                        mutation["payload"],
+                        mutation["projection_target"],
+                    )
+                    operation = "upsert"
+                results.append({
+                    "kind": mutation["kind"],
+                    "record_id": mutation["record_id"],
+                    "revision": revision,
+                    "operation": operation,
+                    "projection_status": "pending" if mutation["projection_target"] else "none",
+                })
+        return results
+
+    def _save_record_in_transaction(
+        self,
+        connection: sqlite3.Connection,
+        kind: str,
+        record_id: str,
+        payload: dict[str, Any],
+        projection_target: str | None,
+    ) -> int:
         now = str(payload.get("updated_at") or utc_now())
         created_at = str(payload.get("created_at") or now)
         serialized = json.dumps(payload, ensure_ascii=False)
-        with self.transaction() as connection:
-            current = connection.execute(
-                "SELECT revision, source_hash FROM research_records WHERE kind=? AND id=?", (kind, record_id)
-            ).fetchone()
-            journal_revision = int(connection.execute(
-                "SELECT COALESCE(MAX(entity_revision), 0) FROM projection_journal WHERE entity_kind=? AND entity_id=?",
-                (kind, record_id),
-            ).fetchone()[0])
-            serialized_hash = content_hash(serialized)
-            if current and current["source_hash"] == serialized_hash:
-                revision = int(current["revision"])
-            else:
-                revision = max(
-                    int(payload.get("revision") or 0),
-                    int(current["revision"] if current else 0) + 1,
-                    journal_revision + 1,
-                )
-            connection.execute(
-                """INSERT INTO research_records(kind, id, payload, revision, created_at, updated_at, source_hash)
-                   VALUES(?, ?, ?, ?, ?, ?, ?)
-                   ON CONFLICT(kind, id) DO UPDATE SET payload=excluded.payload, revision=excluded.revision,
-                     updated_at=excluded.updated_at, source_hash=excluded.source_hash""",
-                (kind, record_id, serialized, revision, created_at, now, serialized_hash),
+        serialized_hash = content_hash(serialized)
+        current = connection.execute(
+            "SELECT revision, source_hash FROM research_records WHERE kind=? AND id=?", (kind, record_id)
+        ).fetchone()
+        journal_revision = int(connection.execute(
+            "SELECT COALESCE(MAX(entity_revision), 0) FROM projection_journal WHERE entity_kind=? AND entity_id=?",
+            (kind, record_id),
+        ).fetchone()[0])
+        if current and current["source_hash"] == serialized_hash:
+            revision = int(current["revision"])
+        else:
+            revision = max(
+                int(payload.get("revision") or 0),
+                int(current["revision"] if current else 0) + 1,
+                journal_revision + 1,
             )
-            self._project_personal_record(connection, kind, record_id, payload)
-            if projection_target:
-                payload_hash = serialized_hash
-                journal_id = stable_id("projection", kind, record_id, str(revision))
-                connection.execute(
-                    """INSERT INTO projection_journal
-                       (id, entity_kind, entity_id, entity_revision, operation, payload, payload_hash,
-                        target_relpath, status, attempt_count, last_error_code, created_at, updated_at)
-                       VALUES(?, ?, ?, ?, 'upsert', ?, ?, ?, 'pending', 0, '', ?, ?)
-                       ON CONFLICT(entity_kind, entity_id, entity_revision) DO NOTHING""",
-                    (journal_id, kind, record_id, revision, serialized, payload_hash, projection_target, now, now),
-                )
-        return payload
+        connection.execute(
+            """INSERT INTO research_records(kind, id, payload, revision, created_at, updated_at, source_hash)
+               VALUES(?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(kind, id) DO UPDATE SET payload=excluded.payload, revision=excluded.revision,
+                 updated_at=excluded.updated_at, source_hash=excluded.source_hash""",
+            (kind, record_id, serialized, revision, created_at, now, serialized_hash),
+        )
+        self._project_personal_record(connection, kind, record_id, payload)
+        if projection_target:
+            connection.execute(
+                """INSERT INTO projection_journal
+                   (id, entity_kind, entity_id, entity_revision, operation, payload, payload_hash,
+                    target_relpath, status, attempt_count, last_error_code, created_at, updated_at)
+                   VALUES(?, ?, ?, ?, 'upsert', ?, ?, ?, 'pending', 0, '', ?, ?)
+                   ON CONFLICT(entity_kind, entity_id, entity_revision) DO NOTHING""",
+                (
+                    stable_id("projection", kind, record_id, str(revision)), kind, record_id, revision,
+                    serialized, serialized_hash, projection_target, now, now,
+                ),
+            )
+        return revision
 
     def get_record(self, kind: str, record_id: str) -> dict[str, Any] | None:
         with self._lock:
@@ -795,37 +880,47 @@ class ResearchStore:
 
     def delete_record(self, kind: str, record_id: str, *, projection_target: str | None = None) -> None:
         with self.transaction() as connection:
-            current = connection.execute(
-                "SELECT revision FROM research_records WHERE kind=? AND id=?", (kind, record_id)
-            ).fetchone()
-            latest_journal = connection.execute(
-                """SELECT entity_revision, operation FROM projection_journal
-                   WHERE entity_kind=? AND entity_id=? ORDER BY entity_revision DESC LIMIT 1""",
-                (kind, record_id),
-            ).fetchone()
-            if current is None and latest_journal and latest_journal["operation"] == "delete":
-                return
-            revision = max(
-                int(current["revision"] if current else 0),
-                int(latest_journal["entity_revision"] if latest_journal else 0),
-            ) + 1
-            connection.execute("DELETE FROM research_records WHERE kind=? AND id=?", (kind, record_id))
+            self._delete_record_in_transaction(connection, kind, record_id, projection_target)
+
+    def _delete_record_in_transaction(
+        self,
+        connection: sqlite3.Connection,
+        kind: str,
+        record_id: str,
+        projection_target: str | None,
+    ) -> int:
+        current = connection.execute(
+            "SELECT revision FROM research_records WHERE kind=? AND id=?", (kind, record_id)
+        ).fetchone()
+        latest_journal = connection.execute(
+            """SELECT entity_revision, operation FROM projection_journal
+               WHERE entity_kind=? AND entity_id=? ORDER BY entity_revision DESC LIMIT 1""",
+            (kind, record_id),
+        ).fetchone()
+        if current is None and latest_journal and latest_journal["operation"] == "delete":
+            return int(latest_journal["entity_revision"])
+        revision = max(
+            int(current["revision"] if current else 0),
+            int(latest_journal["entity_revision"] if latest_journal else 0),
+        ) + 1
+        connection.execute("DELETE FROM research_records WHERE kind=? AND id=?", (kind, record_id))
+        connection.execute(
+            "DELETE FROM research_state_edges WHERE source_record_kind=? AND source_record_id=?", (kind, record_id)
+        )
+        connection.execute(
+            "DELETE FROM research_entities WHERE source_record_kind=? AND source_record_id=?", (kind, record_id)
+        )
+        if projection_target:
+            now = utc_now()
             connection.execute(
-                "DELETE FROM research_state_edges WHERE source_record_kind=? AND source_record_id=?", (kind, record_id)
+                """INSERT INTO projection_journal
+                   (id, entity_kind, entity_id, entity_revision, operation, payload, payload_hash,
+                    target_relpath, status, attempt_count, last_error_code, created_at, updated_at)
+                   VALUES(?, ?, ?, ?, 'delete', '{}', '', ?, 'pending', 0, '', ?, ?)
+                   ON CONFLICT(entity_kind, entity_id, entity_revision) DO NOTHING""",
+                (stable_id("projection", kind, record_id, str(revision)), kind, record_id, revision, projection_target, now, now),
             )
-            connection.execute(
-                "DELETE FROM research_entities WHERE source_record_kind=? AND source_record_id=?", (kind, record_id)
-            )
-            if projection_target:
-                now = utc_now()
-                connection.execute(
-                    """INSERT INTO projection_journal
-                       (id, entity_kind, entity_id, entity_revision, operation, payload, payload_hash,
-                        target_relpath, status, attempt_count, last_error_code, created_at, updated_at)
-                       VALUES(?, ?, ?, ?, 'delete', '{}', '', ?, 'pending', 0, '', ?, ?)
-                       ON CONFLICT(entity_kind, entity_id, entity_revision) DO NOTHING""",
-                    (stable_id("projection", kind, record_id, str(revision)), kind, record_id, revision, projection_target, now, now),
-                )
+        return revision
 
     def list_projection_jobs(
         self, *, statuses: tuple[str, ...] = ("pending", "failed"), entity_kind: str | None = None,

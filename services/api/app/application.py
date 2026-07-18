@@ -53,6 +53,10 @@ from .routers.system import create_system_router
 from .routers.drafts import create_draft_router
 from .routers.atlas import create_atlas_router
 from .routers.agent_v2 import create_agent_v2_router
+from .routers.legacy import create_legacy_router
+from .routers.change_review import create_change_review_router
+from .routers.thread_content import create_thread_content_router
+from .routers.task_pack import create_task_pack_router
 from .routers.workspace import create_workspace_router
 from .repositories.personal import safe_document_path, safe_object_memory_path
 from .services.projection import ProjectionService
@@ -60,6 +64,11 @@ from .services.drafts import ThreadDraftService
 from .services.container import AppServices
 from .services.atlas import AtlasService
 from .services.agent_api import AgentApiService
+from .services.legacy_read import LegacyReadService
+from .services.change_review import ChangeReviewService
+from .services.thread_content import ThreadContentService
+from .services.task_pack import TaskPackService
+from .services.provider import ProviderAdapter
 from .services.workspace import WorkspaceService
 from .research.context import build_research_state, evidence_bundle_to_sources, search_for_agent
 from .research.enrichment import KnowledgeEnrichmentService
@@ -145,6 +154,18 @@ def get_atlas_service() -> AtlasService:
         atlas_updates_dir=ATLAS_UPDATES_DIR,
         paper_model=call_openai_task_pack,
     )
+
+
+def get_thread_content_service() -> ThreadContentService:
+    return ThreadContentService(get_workspace_service())
+
+
+def get_change_review_service() -> ChangeReviewService:
+    return ChangeReviewService(get_research_store(), get_workspace_service(), get_atlas_service())
+
+
+def get_task_pack_service() -> TaskPackService:
+    return TaskPackService(get_workspace_service(), get_atlas_service(), ProviderAdapter(SECRET_CANDIDATES))
 
 
 def read_json(path: Path) -> Any:
@@ -301,6 +322,13 @@ app.include_router(
 app.include_router(create_draft_router(lambda: ThreadDraftService(get_research_store())))
 app.include_router(create_workspace_router(get_workspace_service))
 app.include_router(create_atlas_router(get_atlas_service))
+app.include_router(create_thread_content_router(get_thread_content_service))
+app.include_router(create_change_review_router(get_change_review_service))
+app.include_router(create_task_pack_router(get_task_pack_service))
+
+
+def get_legacy_read_service() -> LegacyReadService:
+    return LegacyReadService(load_thread)
 
 
 def load_thread(thread_id: str) -> ThreadDoc:
@@ -1665,7 +1693,6 @@ def apply_atlas_candidate_proposal(proposal: ActionProposal) -> dict[str, Any]:
     return {"candidate_id": candidate.id, "title": candidate.title}
 
 
-@app.post("/api/vnext/threads/{thread_id}/messages", response_model=ThreadDoc)
 def add_message(thread_id: str, payload: MessageCreate) -> ThreadDoc:
     doc = load_thread(thread_id)
     append_message(
@@ -1747,7 +1774,6 @@ def complete_thread_chat_draft(doc: ThreadDoc, assistant: Message, model: str | 
     return doc, assistant, degraded
 
 
-@app.post("/api/vnext/threads/{thread_id}/chat/start", response_model=ThreadChatStartResponse)
 def start_thread_chat(thread_id: str, payload: ThreadChatRequest) -> ThreadChatStartResponse:
     raise HTTPException(status_code=410, detail="旧 chat 写接口已停用，请使用 Agent Runtime v2 turn 接口")
     doc = load_thread(thread_id)
@@ -1791,7 +1817,6 @@ def start_thread_chat(thread_id: str, payload: ThreadChatRequest) -> ThreadChatS
     )
 
 
-@app.post("/api/vnext/threads/{thread_id}/chat/complete", response_model=ThreadChatResponse)
 def complete_thread_chat(thread_id: str, payload: ThreadChatCompleteRequest) -> ThreadChatResponse:
     raise HTTPException(status_code=410, detail="旧 chat 写接口已停用，请使用 Agent Runtime v2 turn 接口")
     doc = load_thread(thread_id)
@@ -1801,7 +1826,6 @@ def complete_thread_chat(thread_id: str, payload: ThreadChatCompleteRequest) -> 
     return ThreadChatResponse(thread=updated, assistant_message=assistant, degraded=degraded)
 
 
-@app.post("/api/vnext/threads/{thread_id}/chat/{assistant_message_id}/retry", response_model=ThreadChatResponse)
 def retry_thread_chat(thread_id: str, assistant_message_id: str, payload: ThreadChatRetryRequest | None = None) -> ThreadChatResponse:
     raise HTTPException(status_code=410, detail="旧 chat 重试接口已停用，请使用 Agent Runtime v2 resume 接口")
     doc = load_thread(thread_id)
@@ -2147,7 +2171,6 @@ def stream_agent_run_events(thread_id: str, run_id: str, model: str | None = Non
     )
 
 
-@app.post("/api/vnext/threads/{thread_id}/agent-runs/start", response_model=AgentRunStartResponse)
 def start_agent_run(thread_id: str, payload: ThreadChatRequest) -> AgentRunStartResponse:
     raise HTTPException(status_code=410, detail="Agent v1 已转为只读历史，请使用 Agent Runtime v2")
     doc = load_thread(thread_id)
@@ -2210,7 +2233,6 @@ def start_agent_run(thread_id: str, payload: ThreadChatRequest) -> AgentRunStart
     )
 
 
-@app.post("/api/vnext/threads/{thread_id}/agent-runs/{run_id}/complete", response_model=AgentRunResponse)
 def complete_agent_run_endpoint(thread_id: str, run_id: str, payload: AgentRunCompleteRequest | None = None) -> AgentRunResponse:
     raise HTTPException(status_code=410, detail="Agent v1 已转为只读历史，请使用 Agent Runtime v2")
     doc = load_thread(thread_id)
@@ -2220,7 +2242,6 @@ def complete_agent_run_endpoint(thread_id: str, run_id: str, payload: AgentRunCo
     return AgentRunResponse(thread=updated, run=find_agent_run(updated, run.id), assistant_message=find_message(updated, assistant.id or ""), degraded=degraded)
 
 
-@app.post("/api/vnext/threads/{thread_id}/agent-runs/{run_id}/stream")
 def stream_agent_run_endpoint(thread_id: str, run_id: str, payload: AgentRunCompleteRequest | None = None) -> StreamingResponse:
     raise HTTPException(status_code=410, detail="Agent v1 已转为只读历史，请使用 Agent Runtime v2")
     return StreamingResponse(
@@ -2230,7 +2251,6 @@ def stream_agent_run_endpoint(thread_id: str, run_id: str, payload: AgentRunComp
     )
 
 
-@app.post("/api/vnext/threads/{thread_id}/agent-runs/{run_id}/retry", response_model=AgentRunResponse)
 def retry_agent_run_endpoint(thread_id: str, run_id: str, payload: AgentRunCompleteRequest | None = None) -> AgentRunResponse:
     raise HTTPException(status_code=410, detail="Agent v1 已转为只读历史，请使用 Agent Runtime v2 resume 接口")
     doc = load_thread(thread_id)
@@ -2260,7 +2280,6 @@ def retry_agent_run_endpoint(thread_id: str, run_id: str, payload: AgentRunCompl
     return AgentRunResponse(thread=updated, run=find_agent_run(updated, run.id), assistant_message=find_message(updated, assistant.id or ""), degraded=degraded)
 
 
-@app.get("/api/vnext/threads/{thread_id}/agent-runs/{run_id}/events")
 def replay_agent_run_events(thread_id: str, run_id: str, after_seq: int = 0) -> StreamingResponse:
     doc = load_thread(thread_id)
     run = find_agent_run(doc, run_id)
@@ -2291,7 +2310,6 @@ def replay_agent_run_events(thread_id: str, run_id: str, after_seq: int = 0) -> 
     return StreamingResponse(replay(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
-@app.post("/api/vnext/threads/{thread_id}/agent-runs/{run_id}/cancel", response_model=AgentRunResponse)
 def cancel_agent_run(thread_id: str, run_id: str) -> AgentRunResponse:
     raise HTTPException(status_code=410, detail="Agent v1 已转为只读历史")
     doc = load_thread(thread_id)
@@ -2310,7 +2328,6 @@ def cancel_agent_run(thread_id: str, run_id: str) -> AgentRunResponse:
     return AgentRunResponse(thread=updated, run=find_agent_run(updated, run_id), assistant_message=find_message(updated, assistant.id or ""), degraded=False)
 
 
-@app.get("/api/vnext/threads/{thread_id}/agent-runs/{run_id}", response_model=AgentRun)
 def get_agent_run(thread_id: str, run_id: str) -> AgentRun:
     return find_agent_run(load_thread(thread_id), run_id)
 
@@ -2547,12 +2564,10 @@ def commit_changeset(
         raise
 
 
-@app.get("/api/vnext/threads/{thread_id}/changesets/{changeset_id}", response_model=ChangeSet)
 def get_changeset(thread_id: str, changeset_id: str) -> ChangeSet:
     return find_changeset(load_thread(thread_id), changeset_id)
 
 
-@app.post("/api/vnext/threads/{thread_id}/changesets/{changeset_id}/confirm", response_model=ChangeSetResponse)
 def confirm_changeset(thread_id: str, changeset_id: str, payload: ChangeSetConfirmRequest) -> ChangeSetResponse:
     doc = load_thread(thread_id)
     changeset = find_changeset(doc, changeset_id)
@@ -2577,7 +2592,6 @@ def confirm_changeset(thread_id: str, changeset_id: str, payload: ChangeSetConfi
     return ChangeSetResponse(thread=updated, changeset=find_changeset(updated, changeset_id), applied=applied)
 
 
-@app.post("/api/vnext/threads/{thread_id}/changesets/{changeset_id}/reject", response_model=ChangeSetResponse)
 def reject_changeset(thread_id: str, changeset_id: str) -> ChangeSetResponse:
     doc = load_thread(thread_id)
     changeset = find_changeset(doc, changeset_id)
@@ -2590,7 +2604,6 @@ def reject_changeset(thread_id: str, changeset_id: str) -> ChangeSetResponse:
     return ChangeSetResponse(thread=updated, changeset=find_changeset(updated, changeset_id), applied={})
 
 
-@app.post("/api/vnext/threads/{thread_id}/changesets/{changeset_id}/undo", response_model=ChangeSetResponse)
 def undo_changeset(thread_id: str, changeset_id: str) -> ChangeSetResponse:
     doc = load_thread(thread_id)
     changeset = find_changeset(doc, changeset_id)
@@ -2604,7 +2617,6 @@ def undo_changeset(thread_id: str, changeset_id: str) -> ChangeSetResponse:
     return ChangeSetResponse(thread=updated, changeset=find_changeset(updated, changeset_id), applied=applied)
 
 
-@app.post("/api/vnext/threads/{thread_id}/action-proposals/{proposal_id}/confirm", response_model=ProposalConfirmResponse)
 def confirm_action_proposal(thread_id: str, proposal_id: str) -> ProposalConfirmResponse:
     doc = load_thread(thread_id)
     proposal = find_action_proposal(doc, proposal_id)
@@ -2643,7 +2655,6 @@ def confirm_action_proposal(thread_id: str, proposal_id: str) -> ProposalConfirm
     return ProposalConfirmResponse(thread=updated, proposal=proposal, applied=applied)
 
 
-@app.post("/api/vnext/threads/{thread_id}/action-proposals/{proposal_id}/reject", response_model=ProposalConfirmResponse)
 def reject_action_proposal(thread_id: str, proposal_id: str) -> ProposalConfirmResponse:
     doc = load_thread(thread_id)
     proposal = find_action_proposal(doc, proposal_id)
@@ -2672,7 +2683,6 @@ def reject_action_proposal(thread_id: str, proposal_id: str) -> ProposalConfirmR
     return ProposalConfirmResponse(thread=updated, proposal=proposal, applied={})
 
 
-@app.post("/api/vnext/threads/{thread_id}/context-injections", response_model=ThreadDoc)
 def add_context_injection(thread_id: str, payload: ContextInjectionRequest) -> ThreadDoc:
     doc = load_thread(thread_id)
     source = scrub_refs(payload.source or {})
@@ -2704,7 +2714,6 @@ def add_context_injection(thread_id: str, payload: ContextInjectionRequest) -> T
     return write_thread(doc)
 
 
-@app.post("/api/vnext/threads/{thread_id}/chat", response_model=ThreadChatResponse)
 def chat_with_thread(thread_id: str, payload: ThreadChatRequest) -> ThreadChatResponse:
     raise HTTPException(status_code=410, detail="旧 chat 写接口已停用，请使用 Agent Runtime v2 turn 接口")
     doc = load_thread(thread_id)
@@ -2776,7 +2785,6 @@ def chat_with_thread(thread_id: str, payload: ThreadChatRequest) -> ThreadChatRe
     return ThreadChatResponse(thread=updated, assistant_message=assistant_item, degraded=degraded)
 
 
-@app.put("/api/vnext/threads/{thread_id}/messages/{message_id}", response_model=ThreadDoc)
 def update_message(thread_id: str, message_id: str, payload: MessageUpdate) -> ThreadDoc:
     doc = load_thread(thread_id)
     for message in doc.messages:
@@ -2795,7 +2803,6 @@ def update_message(thread_id: str, message_id: str, payload: MessageUpdate) -> T
     raise HTTPException(status_code=404, detail="message not found")
 
 
-@app.post("/api/vnext/threads/{thread_id}/tool-runs", response_model=ThreadDoc)
 def add_tool_run(thread_id: str, payload: ToolRunCreate) -> ThreadDoc:
     doc = load_thread(thread_id)
     run = ToolRun(
@@ -3835,18 +3842,15 @@ def text_from_item(item: Any) -> tuple[str, str]:
     return str(item), ""
 
 
-@app.get("/api/vnext/research-templates", response_model=list[ResearchTemplate])
 def list_research_templates() -> list[ResearchTemplate]:
     return list(RESEARCH_TEMPLATES.values())
 
 
-@app.post("/api/vnext/threads/{thread_id}/task-pack/preview", response_model=TaskPackPreviewResponse)
 def preview_task_pack(thread_id: str, payload: TaskPackPreviewRequest) -> TaskPackPreviewResponse:
     doc = load_thread(thread_id)
     return build_task_pack(doc, payload)
 
 
-@app.post("/api/vnext/threads/{thread_id}/task-pack/run", response_model=TaskPackRunResponse)
 def run_task_pack(thread_id: str, payload: TaskPackRunRequest) -> TaskPackRunResponse:
     doc = load_thread(thread_id)
     preview = build_task_pack(doc, payload)
@@ -3896,7 +3900,6 @@ def run_task_pack(thread_id: str, payload: TaskPackRunRequest) -> TaskPackRunRes
     )
 
 
-@app.post("/api/vnext/threads/{thread_id}/results/preview", response_model=ResultPreviewResponse)
 def preview_result(thread_id: str, payload: ResultPreviewRequest) -> ResultPreviewResponse:
     doc = load_thread(thread_id)
     raw = payload.raw_text.strip()
@@ -3955,7 +3958,6 @@ def preview_result(thread_id: str, payload: ResultPreviewRequest) -> ResultPrevi
     )
 
 
-@app.post("/api/vnext/threads/{thread_id}/export", response_model=ExportResponse)
 def export_thread(thread_id: str, payload: ExportRequest) -> ExportResponse:
     doc = load_thread(thread_id)
     cards = [
@@ -4034,7 +4036,6 @@ def export_thread(thread_id: str, payload: ExportRequest) -> ExportResponse:
     )
 
 
-@app.post("/api/vnext/threads/{thread_id}/results", response_model=ThreadDoc)
 def add_result(thread_id: str, payload: ResultCard) -> ThreadDoc:
     doc = load_thread(thread_id)
     result = payload.model_copy()
@@ -4513,6 +4514,30 @@ def v2_canvas_apply(canvas: CanvasState, arguments: dict[str, Any]) -> list[dict
 def v2_apply_operation_batch(batch: AgentV2OperationBatch, resolution: AgentV2ApprovalResolveRequest) -> dict[str, Any]:
     with APP_SERVICES.agent_thread_lock:
         doc = load_thread(batch.thread_id)
+        existing_receipt = next(
+            (
+                message
+                for message in doc.messages
+                if isinstance(message.refs, dict)
+                and message.refs.get("operation_batch_id") == batch.id
+                and not message.refs.get("undone")
+            ),
+            None,
+        )
+        if existing_receipt:
+            for operation in batch.operations:
+                operation.after = v2_current_operation_value(doc, operation)
+            batch.status = "applied"
+            batch.applied_at = batch.applied_at or existing_receipt.created_at or utc_now()
+            batch.updated_at = utc_now()
+            batch.receipt = {**batch.receipt, "reconciled": True}
+            get_agent_v2_runtime().store.save_operation_batch(batch)
+            return {
+                "status": "applied", "operation_batch_id": batch.id,
+                "transaction_id": batch.receipt.get("transaction_id", ""),
+                "operations": batch.receipt.get("operations", []),
+                "thread": doc.model_dump(mode="json"), "reconciled": True,
+            }
         if doc.revision != batch.base_revision:
             raise HTTPException(status_code=409, detail={"message": "线程在确认前发生变化", "expected_revision": batch.base_revision, "current_revision": doc.revision})
         conflicts = []
@@ -4614,46 +4639,92 @@ def v2_apply_operation_batch(batch: AgentV2OperationBatch, resolution: AgentV2Ap
             else:
                 raise HTTPException(status_code=400, detail=f"unsupported Agent v2 capability: {capability_id}")
 
-        snapshots = {path: transaction_snapshot(path) for path in touched_paths}
         journal_id = slug_id("agent_v2_transaction")
-        journal_path = PERSONAL_DIR / "transactions" / f"{journal_id}.json"
-        atomic_write_json(journal_path, {"id": journal_id, "batch_id": batch.id, "task_id": batch.task_id, "status": "committing", "targets": [str(path) for path in touched_paths], "created_at": utc_now()})
+        append_message(thread_copy, Message(
+            role="tool", kind="state", content=f"已应用 Agent v2 操作：{batch.summary}", surface="thread",
+            refs={"agent_v2_task_id": batch.task_id, "operation_batch_id": batch.id},
+        ))
+        thread_copy.revision += 1
+        thread_copy.updated_at = utc_now()
+        mutations: list[dict[str, Any]] = [{
+            "kind": "thread", "record_id": doc.id,
+            "expected_payload": get_research_store().get_record("thread", doc.id),
+            "payload": thread_copy.model_dump(mode="json"),
+            "projection_target": projection_target(safe_thread_path(doc.id)),
+        }]
+        for project_id, project in project_docs.items():
+            project.updated_at = utc_now()
+            mutations.append({
+                "kind": "project", "record_id": project_id,
+                "expected_payload": get_research_store().get_record("project", project_id),
+                "payload": project.model_dump(mode="json"),
+                "projection_target": projection_target(safe_project_path(project_id)),
+            })
+        for (atlas_id, object_type, object_id), memory in memories.items():
+            memory.object_ref = {**memory.object_ref, "atlas_id": atlas_id, "object_type": object_type, "object_id": object_id}
+            memory.tags = [tag.strip() for tag in memory.tags if tag.strip()]
+            memory.updated_at = utc_now()
+            record_id = f"{atlas_id}:{object_type}:{object_id}"
+            mutations.append({
+                "kind": "object_memory", "record_id": record_id,
+                "expected_payload": get_research_store().get_record("object_memory", record_id),
+                "payload": memory.model_dump(mode="json"),
+                "projection_target": projection_target(safe_object_path(atlas_id, object_type, object_id)),
+            })
+        for atlas_id, atlas_doc in atlas_docs.items():
+            atlas_doc.updated_at = utc_now()
+            mutations.append({
+                "kind": "atlas_update", "record_id": atlas_id,
+                "expected_payload": get_research_store().get_record("atlas_update", atlas_id),
+                "payload": atlas_doc.model_dump(mode="json"),
+                "projection_target": projection_target(safe_atlas_update_path(atlas_id)),
+            })
+        journal = get_research_store().apply_record_batch(mutations)
+        ProjectionService(get_research_store(), PERSONAL_DIR).replay(limit=max(20, len(journal) * 2))
+        promoted_drafts: list[str] = []
         try:
-            promoted_drafts: list[str] = []
             for draft_id in memory_promotions:
                 get_agent_v2_runtime().store.promote_memory(draft_id, utc_now())
                 promoted_drafts.append(draft_id)
-            for project in project_docs.values():
-                write_project(project)
-            for (atlas_id, object_type, object_id), memory in memories.items():
-                write_object_memory(atlas_id, object_type, object_id, memory)
-            for atlas_doc in atlas_docs.values():
-                write_atlas_updates(atlas_doc)
-            append_message(thread_copy, Message(role="tool", kind="state", content=f"已应用 Agent v2 操作：{batch.summary}", surface="thread", refs={"agent_v2_task_id": batch.task_id, "operation_batch_id": batch.id}))
-            updated = write_thread(thread_copy)
-            for operation in batch.operations:
-                operation.after = v2_current_operation_value(updated, operation)
-            batch.status = "applied"
-            batch.applied_at = utc_now()
-            batch.updated_at = batch.applied_at
-            batch.receipt = {"transaction_id": journal_id, "operations": applied}
-            atomic_write_json(journal_path, {"id": journal_id, "batch_id": batch.id, "status": "committed", "updated_at": utc_now()})
-            get_agent_v2_runtime().store.save_operation_batch(batch)
-            return {"status": "applied", "operation_batch_id": batch.id, "transaction_id": journal_id, "operations": applied, "thread": updated.model_dump(mode="json")}
         except Exception:
-            for draft_id in locals().get("promoted_drafts", []):
+            for draft_id in promoted_drafts:
                 get_agent_v2_runtime().store.revert_promoted_memory(draft_id)
-            for path, snapshot in snapshots.items():
-                restore_transaction_snapshot(path, snapshot)
-            atomic_write_json(journal_path, {"id": journal_id, "batch_id": batch.id, "status": "rolled_back", "updated_at": utc_now()})
             raise
+        updated = load_thread(doc.id)
+        for operation in batch.operations:
+            operation.after = v2_current_operation_value(updated, operation)
+        batch.status = "applied"
+        batch.applied_at = utc_now()
+        batch.updated_at = batch.applied_at
+        batch.receipt = {"transaction_id": journal_id, "operations": applied, "projection_journal": journal}
+        get_agent_v2_runtime().store.save_operation_batch(batch)
+        return {
+            "status": "applied", "operation_batch_id": batch.id, "transaction_id": journal_id,
+            "operations": applied, "thread": updated.model_dump(mode="json"),
+        }
 
 
 def v2_undo_operation_batch(batch: AgentV2OperationBatch) -> dict[str, Any]:
     with APP_SERVICES.agent_thread_lock:
+        doc = load_thread(batch.thread_id)
+        existing_undo = next(
+            (
+                message for message in doc.messages
+                if isinstance(message.refs, dict)
+                and message.refs.get("operation_batch_id") == batch.id
+                and message.refs.get("undone") is True
+            ),
+            None,
+        )
+        if existing_undo:
+            batch.status = "undone"
+            batch.undone_at = batch.undone_at or existing_undo.created_at or utc_now()
+            batch.updated_at = utc_now()
+            batch.receipt = {**batch.receipt, "undo_reconciled": True}
+            get_agent_v2_runtime().store.save_operation_batch(batch)
+            return {"status": "undone", "operation_batch": batch.model_dump(mode="json"), "thread": doc.model_dump(mode="json"), "reconciled": True}
         if batch.status != "applied":
             raise HTTPException(status_code=409, detail="只有已应用的操作批次可以撤销")
-        doc = load_thread(batch.thread_id)
         conflicts = []
         for operation in batch.operations:
             current = v2_current_operation_value(doc, operation)
@@ -4722,72 +4793,71 @@ def v2_undo_operation_batch(batch: AgentV2OperationBatch) -> dict[str, Any]:
             else:
                 raise HTTPException(status_code=400, detail=f"unsupported Agent v2 undo capability: {capability_id}")
 
-        snapshots = {path: transaction_snapshot(path) for path in touched_paths}
         journal_id = slug_id("agent_v2_undo")
-        journal_path = PERSONAL_DIR / "transactions" / f"{journal_id}.json"
-        atomic_write_json(
-            journal_path,
-            {"id": journal_id, "batch_id": batch.id, "status": "undoing", "targets": [str(path) for path in touched_paths], "created_at": utc_now()},
-        )
-        reverted_promotions: list[str] = []
-        try:
-            for draft_id in promoted_drafts:
-                get_agent_v2_runtime().store.revert_promoted_memory(draft_id)
-                reverted_promotions.append(draft_id)
-            for project in project_docs.values():
-                write_project(project)
-            for (atlas_id, object_type, object_id), memory in memories.items():
-                path = safe_object_path(atlas_id, object_type, object_id)
-                if memory is None:
-                    path.unlink(missing_ok=True)
-                else:
-                    write_object_memory(atlas_id, object_type, object_id, memory)
-            for atlas_doc in atlas_docs.values():
-                write_atlas_updates(atlas_doc)
-            append_message(
-                thread_copy,
-                Message(
-                    role="tool",
-                    kind="state",
-                    content=f"已撤销 Agent v2 操作：{batch.summary}",
-                    surface="thread",
-                    refs={"agent_v2_task_id": batch.task_id, "operation_batch_id": batch.id, "undone": True},
-                ),
-            )
-            batch.status = "undone"
-            batch.undone_at = utc_now()
-            batch.updated_at = batch.undone_at
-            batch.receipt = {**batch.receipt, "undo_transaction_id": journal_id}
-            task = get_agent_v2_runtime().store.get_task(batch.task_id)
-            if task:
-                try:
-                    assistant = find_message(thread_copy, task.assistant_message_id)
-                    existing_batches = assistant.refs.get("agent_v2_operation_batches") if isinstance(assistant.refs, dict) else []
-                    assistant.refs = scrub_refs(
-                        {
-                            **(assistant.refs or {}),
-                            "agent_v2_operation_batches": [
-                                batch.model_dump(mode="json") if item.get("id") == batch.id else item
-                                for item in (existing_batches or [])
-                            ] or [batch.model_dump(mode="json")],
-                        }
-                    )
-                except HTTPException:
-                    pass
-            updated = write_thread(thread_copy)
-            atomic_write_json(journal_path, {"id": journal_id, "batch_id": batch.id, "status": "undone", "updated_at": utc_now()})
-            get_agent_v2_runtime().store.save_operation_batch(batch)
-            return {"status": "undone", "operation_batch": batch.model_dump(mode="json"), "thread": updated.model_dump(mode="json")}
-        except Exception:
-            for path, snapshot in snapshots.items():
-                restore_transaction_snapshot(path, snapshot)
-            for draft_id in reverted_promotions:
-                try:
-                    get_agent_v2_runtime().store.promote_memory(draft_id, utc_now())
-                except Exception:
-                    pass
-            atomic_write_json(journal_path, {"id": journal_id, "batch_id": batch.id, "status": "rollback", "updated_at": utc_now()})
-            raise
+        batch.status = "undone"
+        batch.undone_at = utc_now()
+        batch.updated_at = batch.undone_at
+        batch.receipt = {**batch.receipt, "undo_transaction_id": journal_id}
+        task = get_agent_v2_runtime().store.get_task(batch.task_id)
+        if task:
+            try:
+                assistant = find_message(thread_copy, task.assistant_message_id)
+                existing_batches = assistant.refs.get("agent_v2_operation_batches") if isinstance(assistant.refs, dict) else []
+                assistant.refs = scrub_refs({
+                    **(assistant.refs or {}),
+                    "agent_v2_operation_batches": [
+                        batch.model_dump(mode="json") if item.get("id") == batch.id else item
+                        for item in (existing_batches or [])
+                    ] or [batch.model_dump(mode="json")],
+                })
+            except HTTPException:
+                pass
+        append_message(thread_copy, Message(
+            role="tool", kind="state", content=f"已撤销 Agent v2 操作：{batch.summary}", surface="thread",
+            refs={"agent_v2_task_id": batch.task_id, "operation_batch_id": batch.id, "undone": True},
+        ))
+        thread_copy.revision += 1
+        thread_copy.updated_at = utc_now()
+        mutations: list[dict[str, Any]] = [{
+            "kind": "thread", "record_id": doc.id,
+            "expected_payload": get_research_store().get_record("thread", doc.id),
+            "payload": thread_copy.model_dump(mode="json"),
+            "projection_target": projection_target(safe_thread_path(doc.id)),
+        }]
+        for project_id, project in project_docs.items():
+            project.updated_at = utc_now()
+            mutations.append({
+                "kind": "project", "record_id": project_id,
+                "expected_payload": get_research_store().get_record("project", project_id),
+                "payload": project.model_dump(mode="json"),
+                "projection_target": projection_target(safe_project_path(project_id)),
+            })
+        for (atlas_id, object_type, object_id), memory in memories.items():
+            record_id = f"{atlas_id}:{object_type}:{object_id}"
+            if memory is not None:
+                memory.updated_at = utc_now()
+            mutations.append({
+                "kind": "object_memory", "record_id": record_id,
+                "expected_payload": get_research_store().get_record("object_memory", record_id),
+                "payload": memory.model_dump(mode="json") if memory is not None else None,
+                "projection_target": projection_target(safe_object_path(atlas_id, object_type, object_id)),
+            })
+        for atlas_id, atlas_doc in atlas_docs.items():
+            atlas_doc.updated_at = utc_now()
+            mutations.append({
+                "kind": "atlas_update", "record_id": atlas_id,
+                "expected_payload": get_research_store().get_record("atlas_update", atlas_id),
+                "payload": atlas_doc.model_dump(mode="json"),
+                "projection_target": projection_target(safe_atlas_update_path(atlas_id)),
+            })
+        journal = get_research_store().apply_record_batch(mutations)
+        ProjectionService(get_research_store(), PERSONAL_DIR).replay(limit=max(20, len(journal) * 2))
+        for draft_id in promoted_drafts:
+            get_agent_v2_runtime().store.revert_promoted_memory(draft_id)
+        updated = load_thread(doc.id)
+        batch.receipt = {**batch.receipt, "undo_projection_journal": journal}
+        get_agent_v2_runtime().store.save_operation_batch(batch)
+        return {"status": "undone", "operation_batch": batch.model_dump(mode="json"), "thread": updated.model_dump(mode="json")}
 
 
 def get_agent_v2_runtime() -> AgentRuntimeV2:
@@ -4855,3 +4925,4 @@ def get_agent_api_service() -> AgentApiService:
 app.include_router(create_research_router(get_research_store, get_knowledge_enrichment, get_page_preview_service))
 app.include_router(create_campaign_router(get_campaign_service))
 app.include_router(create_agent_v2_router(get_agent_api_service))
+app.include_router(create_legacy_router(get_legacy_read_service))

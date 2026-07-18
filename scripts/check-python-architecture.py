@@ -20,6 +20,10 @@ ROUTE_ALLOWLIST = {
     "routers/workspace.py",
     "routers/atlas.py",
     "routers/agent_v2.py",
+    "routers/legacy.py",
+    "routers/thread_content.py",
+    "routers/change_review.py",
+    "routers/task_pack.py",
 }
 DIRECT_REPOSITORY_ROUTER_ALLOWLIST = {"research/router.py"}
 APPLICATION_CONFIG_GLOBALS = {

@@ -214,6 +214,78 @@ class ResearchStoreTest(unittest.TestCase):
             )
             store.close()
 
+    def test_record_batch_rolls_back_all_canonical_rows_and_outbox_jobs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = ResearchStore(root / "research", ATLAS_DIR, root / "personal")
+            original_project = store._project_personal_record
+            calls = 0
+
+            def fail_second_projection(connection, kind, record_id, payload):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise RuntimeError("injected canonical projection failure")
+                return original_project(connection, kind, record_id, payload)
+
+            try:
+                with patch.object(store, "_project_personal_record", side_effect=fail_second_projection):
+                    with self.assertRaises(RuntimeError):
+                        store.apply_record_batch([
+                            {
+                                "kind": "thread",
+                                "record_id": "thread-batch",
+                                "expected_payload": None,
+                                "payload": {"id": "thread-batch", "title": "Thread"},
+                                "projection_target": "threads/thread-batch.json",
+                            },
+                            {
+                                "kind": "project",
+                                "record_id": "project-batch",
+                                "expected_payload": None,
+                                "payload": {"id": "project-batch", "title": "Project"},
+                                "projection_target": "projects/project-batch.json",
+                            },
+                        ])
+                self.assertIsNone(store.get_record("thread", "thread-batch"))
+                self.assertIsNone(store.get_record("project", "project-batch"))
+                self.assertEqual(store.projection_status(), {})
+            finally:
+                store.close()
+
+    def test_record_batch_checks_all_expected_payloads_before_writing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = ResearchStore(root / "research", ATLAS_DIR, root / "personal")
+            try:
+                thread = {"id": "thread-conflict", "title": "Current"}
+                project = {"id": "project-conflict", "title": "Current"}
+                store.save_record("thread", "thread-conflict", thread)
+                store.save_record("project", "project-conflict", project)
+                with self.assertRaises(Exception) as raised:
+                    store.apply_record_batch([
+                        {
+                            "kind": "thread",
+                            "record_id": "thread-conflict",
+                            "expected_payload": thread,
+                            "payload": {**thread, "title": "Updated"},
+                            "projection_target": "threads/thread-conflict.json",
+                        },
+                        {
+                            "kind": "project",
+                            "record_id": "project-conflict",
+                            "expected_payload": {**project, "title": "Stale"},
+                            "payload": {**project, "title": "Updated"},
+                            "projection_target": "projects/project-conflict.json",
+                        },
+                    ])
+                self.assertEqual(getattr(raised.exception, "detail", {}).get("record_id"), "project-conflict")
+                self.assertEqual(store.get_record("thread", "thread-conflict"), thread)
+                self.assertEqual(store.get_record("project", "project-conflict"), project)
+                self.assertEqual(store.projection_status(), {})
+            finally:
+                store.close()
+
     def test_projection_replay_never_applies_failed_old_revision_after_newer_commit(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

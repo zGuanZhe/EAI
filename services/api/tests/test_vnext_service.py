@@ -1543,7 +1543,8 @@ class VNextServiceTest(unittest.TestCase):
                 )
                 self.assertEqual(conflicted.status_code, 409)
                 self.assertEqual(main.load_object_memory("G", "paper", "paper-a").judgement, "用户运行中手动修改")
-                self.assertTrue(any((main.PERSONAL_DIR / "transactions").glob("*.json")))
+                self.assertEqual(list((main.PERSONAL_DIR / "transactions").glob("*.json")), [])
+                self.assertEqual(main.get_research_store().projection_status().get("failed", 0), 0)
             finally:
                 (
                     main.PERSONAL_DIR,

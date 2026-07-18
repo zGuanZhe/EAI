@@ -968,11 +968,50 @@ class AgentRuntimeV2Test(unittest.TestCase):
             updated_at=now,
         )
         prepared = main.v2_prepare_operation_batch(batch)
-        with patch.object(main, "write_thread", side_effect=RuntimeError("simulated write failure")):
+        store = main.get_research_store()
+        original_projection = store._project_personal_record
+        projection_calls = 0
+
+        def fail_later_canonical_write(connection, kind, record_id, payload):
+            nonlocal projection_calls
+            projection_calls += 1
+            if projection_calls == 2:
+                raise RuntimeError("simulated write failure")
+            return original_projection(connection, kind, record_id, payload)
+
+        with patch.object(store, "_project_personal_record", side_effect=fail_later_canonical_write):
             with self.assertRaisesRegex(RuntimeError, "simulated write failure"):
                 main.v2_apply_operation_batch(prepared, ApprovalResolveRequest(decision="approve"))
         self.assertEqual(main.load_project(project["id"]).title, "Original project")
         self.assertEqual(main.load_thread(thread["id"]).context_cards, [])
+
+    def test_operation_batch_reconciles_commit_after_runtime_receipt_failure(self):
+        thread = self.create_thread("Receipt reconciliation")
+        now = main.utc_now()
+        batch = OperationBatch(
+            id="batch-reconcile",
+            task_id="task-reconcile",
+            thread_id=thread["id"],
+            summary="Add exactly one context card",
+            operations=[Operation(
+                id="operation-reconcile-context",
+                capability="context.add",
+                arguments={"title": "Reconciled context", "source_ref": {"type": "note", "id": "reconcile"}},
+            )],
+            created_at=now,
+            updated_at=now,
+        )
+        prepared = main.v2_prepare_operation_batch(batch)
+        runtime_store = main.get_agent_v2_runtime().store
+        with patch.object(runtime_store, "save_operation_batch", side_effect=RuntimeError("receipt write failed")):
+            with self.assertRaisesRegex(RuntimeError, "receipt write failed"):
+                main.v2_apply_operation_batch(prepared, ApprovalResolveRequest(decision="approve"))
+        committed = main.load_thread(thread["id"])
+        self.assertEqual([card.title for card in committed.context_cards], ["Reconciled context"])
+
+        reconciled = main.v2_apply_operation_batch(prepared, ApprovalResolveRequest(decision="approve"))
+        self.assertTrue(reconciled["reconciled"])
+        self.assertEqual([card.title for card in main.load_thread(thread["id"]).context_cards], ["Reconciled context"])
 
     def test_docker_unavailable_never_executes_on_host(self):
         workspace = Path(self.temp.name) / "docker-unavailable"
