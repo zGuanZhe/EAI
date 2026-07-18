@@ -4,7 +4,9 @@ import tempfile
 import unittest
 import os
 import json
+import hashlib
 import shutil
+import sqlite3
 from pathlib import Path
 import sys
 from unittest.mock import patch
@@ -33,6 +35,17 @@ class VNextServiceTest(unittest.TestCase):
             if data_lines:
                 events.append((event, json.loads("\n".join(data_lines))))
         return events
+
+    def test_openapi_contract_matches_reviewed_vnext_baseline(self):
+        schema = json.loads(json.dumps(main.app.openapi()))
+        schema.get("info", {}).pop("version", None)
+        serialized = json.dumps(schema, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        self.assertEqual(len(schema["paths"]), 102)
+        self.assertEqual(sum(len(operations) for operations in schema["paths"].values()), 109)
+        self.assertEqual(
+            hashlib.sha256(serialized.encode("utf-8")).hexdigest(),
+            "91501d8801616771ea4cc14a29e02f7c8f9a67cd2e8de8deb6ef651b7a510aec",
+        )
 
     def test_system_info_exposes_runtime_boundaries_without_secrets(self):
         client = TestClient(main.app)
@@ -80,6 +93,105 @@ class VNextServiceTest(unittest.TestCase):
                 os.environ.pop("EAI_DESKTOP_SESSION_TOKEN", None)
             else:
                 os.environ["EAI_DESKTOP_SESSION_TOKEN"] = original
+
+    def test_newer_research_schema_starts_read_only_without_runtime_side_effects(self):
+        original = {
+            "PERSONAL_DIR": main.PERSONAL_DIR,
+            "THREADS_DIR": main.THREADS_DIR,
+            "BACKUPS_DIR": main.BACKUPS_DIR,
+            "PROJECTS_DIR": main.PROJECTS_DIR,
+            "OBJECTS_DIR": main.OBJECTS_DIR,
+            "ATLAS_UPDATES_DIR": main.ATLAS_UPDATES_DIR,
+            "LAB_RUNS_DIR": main.LAB_RUNS_DIR,
+            "RUNTIME_V2_DIR": main.RUNTIME_V2_DIR,
+            "RESEARCH_STORE": main.RESEARCH_STORE,
+            "AGENT_V2_RUNTIME": main.AGENT_V2_RUNTIME,
+            "CAMPAIGN_SERVICE": main.CAMPAIGN_SERVICE,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            personal = root / "personal"
+            try:
+                main.PERSONAL_DIR = personal
+                main.THREADS_DIR = personal / "threads"
+                main.BACKUPS_DIR = personal / "backups"
+                main.PROJECTS_DIR = personal / "projects"
+                main.OBJECTS_DIR = personal / "objects"
+                main.ATLAS_UPDATES_DIR = personal / "atlas_updates"
+                main.LAB_RUNS_DIR = personal / "lab_runs"
+                main.RUNTIME_V2_DIR = root / "runtime"
+                main.RESEARCH_STORE = None
+                main.AGENT_V2_RUNTIME = None
+                main.CAMPAIGN_SERVICE = None
+                main.ensure_dirs()
+
+                client = TestClient(main.app)
+                created = client.post(
+                    "/api/vnext/threads",
+                    json={"title": "Future schema thread", "active_atlas_id": "I"},
+                )
+                self.assertEqual(created.status_code, 200, created.text)
+                thread = created.json()
+                main.get_agent_v2_runtime().close()
+                main.AGENT_V2_RUNTIME = None
+                main.RESEARCH_STORE.close()
+                main.RESEARCH_STORE = None
+
+                research_db = root / "research" / "research.db"
+                connection = sqlite3.connect(research_db)
+                connection.execute(
+                    "INSERT INTO schema_migrations(version, applied_at, summary) VALUES(4, 'future', 'future schema')"
+                )
+                connection.commit()
+                connection.close()
+                research_before = research_db.read_bytes()
+                runtime_db = root / "runtime" / "runtime.db"
+                runtime_before = runtime_db.read_bytes()
+
+                read_only_client = TestClient(main.app)
+                info = read_only_client.get("/api/vnext/system/info")
+                self.assertEqual(info.status_code, 200, info.text)
+                self.assertTrue(info.json()["research_store"]["read_only"])
+                loaded = read_only_client.get(f"/api/vnext/threads/{thread['id']}")
+                self.assertEqual(loaded.status_code, 200, loaded.text)
+                searched = read_only_client.post(
+                    "/api/vnext/sources/search",
+                    json={"query": "robot learning", "source_policy": "local_only", "limit": 4},
+                )
+                self.assertEqual(searched.status_code, 200, searched.text)
+
+                blocked_requests = {
+                    "thread_update": read_only_client.put(
+                        f"/api/vnext/threads/{thread['id']}",
+                        json={"title": "Blocked", "expected_revision": thread["revision"]},
+                    ),
+                    "agent_turn": read_only_client.post(
+                        f"/api/vnext/threads/{thread['id']}/agent-v2/turns",
+                        json={"message": "This must not start", "intent_override": "auto"},
+                    ),
+                    "campaign_install": read_only_client.post("/api/vnext/campaign-runtime/install?profile=cpu", json={}),
+                }
+                for name, response in blocked_requests.items():
+                    self.assertEqual(response.status_code, 409, f"{name}: {response.text}")
+                    detail = response.json()["detail"]
+                    self.assertIsInstance(detail, dict, f"{name}: {response.text}")
+                    self.assertEqual(detail["code"], "schema_newer_than_app")
+
+                if main.AGENT_V2_RUNTIME is not None:
+                    main.AGENT_V2_RUNTIME.close()
+                    main.AGENT_V2_RUNTIME = None
+                if main.RESEARCH_STORE is not None:
+                    main.RESEARCH_STORE.close()
+                    main.RESEARCH_STORE = None
+                self.assertEqual(research_db.read_bytes(), research_before)
+                self.assertEqual(runtime_db.read_bytes(), runtime_before)
+            finally:
+                if main.AGENT_V2_RUNTIME is not None:
+                    main.AGENT_V2_RUNTIME.close()
+                if main.RESEARCH_STORE is not None:
+                    main.RESEARCH_STORE.close()
+                for name, value in original.items():
+                    setattr(main, name, value)
 
     def test_legacy_runs_are_readable_and_mutation_endpoints_are_gone(self):
         fixture = Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "legacy" / "thread-with-agent-run.json"

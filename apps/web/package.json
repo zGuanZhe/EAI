@@ -1,7 +1,7 @@
 {
   "name": "@eai/web",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5173",
@@ -22,6 +22,10 @@
     "vite": "^7.0.0"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "axe-core": "^4.10.3",
+    "jsdom": "^26.1.0",
     "vitest": "^3.2.4"
   }
 }

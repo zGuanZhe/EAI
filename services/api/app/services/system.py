@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Callable
 
 from ..core.paths import public_path
 from ..core.secrets import read_secret_data, safe_secret_status
@@ -18,6 +19,7 @@ def build_system_info(
     personal_dir: Path,
     atlas_cache_dir: Path,
     secret_candidates: list[Path | None],
+    research_status: Callable[[], dict[str, object]] | None = None,
 ) -> dict[str, object]:
     data, path = read_secret_data(secret_candidates)
     runtime_mode = current_runtime_mode()
@@ -30,4 +32,5 @@ def build_system_info(
         "log_dir": public_path(Path(os.environ.get("EAI_DESKTOP_LOG_DIR", personal_dir / "logs"))),
         "active_backend_id": f"{root.name}:{service_version}",
         "secrets_status": safe_secret_status(data, path, bool(os.environ.get("OPENAI_API_KEY"))),
+        "research_store": research_status() if research_status else None,
     }

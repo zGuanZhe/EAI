@@ -64,7 +64,7 @@ from .research.enrichment import KnowledgeEnrichmentService
 from .research.router import create_research_router
 from .research.store import ResearchStore
 
-SERVICE_VERSION = "0.4.0"
+SERVICE_VERSION = "0.4.1"
 AGENT_EVENT_BUFFERS: dict[str, list[dict[str, Any]]] = {}
 CANCELLED_AGENT_RUNS: set[str] = set()
 DEFAULT_ROOT = Path(__file__).resolve().parents[3]
@@ -249,6 +249,7 @@ app.include_router(
         personal_dir=PERSONAL_DIR,
         atlas_cache_dir=WEB_DATA_DIR,
         secret_candidates=SECRET_CANDIDATES,
+        research_status=lambda: get_research_store().compatibility_status(),
     )
 )
 
@@ -256,6 +257,8 @@ app.include_router(
 @app.on_event("startup")
 def on_startup() -> None:
     ensure_dirs()
+    if get_research_store().read_only:
+        return
     get_agent_v2_runtime()
     get_campaign_service().mark_incomplete_interrupted()
 
@@ -278,6 +281,7 @@ def load_thread(thread_id: str) -> ThreadDoc:
 
 
 def write_thread(doc: ThreadDoc, backup: bool = True) -> ThreadDoc:
+    get_research_store().ensure_writable()
     doc = ThreadDoc.model_validate(doc.model_dump(mode="json") if isinstance(doc, ThreadDoc) else doc)
     path = safe_thread_path(doc.id)
     if backup:
@@ -298,6 +302,7 @@ def load_project(project_id: str) -> ProjectDoc:
 
 
 def write_project(doc: ProjectDoc) -> ProjectDoc:
+    get_research_store().ensure_writable()
     doc = ProjectDoc.model_validate(doc.model_dump(mode="json") if isinstance(doc, ProjectDoc) else doc)
     doc.updated_at = utc_now()
     get_research_store().save_record("project", doc.id, doc.model_dump(mode="json"))
@@ -332,6 +337,7 @@ def effective_object_memory(atlas_id: str, object_type: str, object_id: str) -> 
 
 
 def write_object_memory(atlas_id: str, object_type: str, object_id: str, memory: ObjectMemory) -> ObjectMemory:
+    get_research_store().ensure_writable()
     path = safe_object_path(atlas_id, object_type, object_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     memory.object_ref = {
@@ -366,6 +372,7 @@ def load_atlas_updates(atlas_id: str) -> AtlasUpdateDoc:
 
 
 def write_atlas_updates(doc: AtlasUpdateDoc) -> AtlasUpdateDoc:
+    get_research_store().ensure_writable()
     path = safe_atlas_update_path(doc.atlas_id)
     doc.updated_at = utc_now()
     get_research_store().save_record("atlas_update", doc.atlas_id, doc.model_dump(mode="json"))
@@ -382,6 +389,7 @@ def load_lab_run(run_id: str) -> LabRun:
 
 
 def write_lab_run(run: LabRun) -> LabRun:
+    get_research_store().ensure_writable()
     run = LabRun.model_validate(run.model_dump(mode="json") if isinstance(run, LabRun) else run)
     run.updated_at = utc_now()
     get_research_store().save_record("lab_run", run.id, run.model_dump(mode="json"))
@@ -5557,7 +5565,13 @@ def v2_undo_operation_batch(batch: AgentV2OperationBatch) -> dict[str, Any]:
 def get_agent_v2_runtime() -> AgentRuntimeV2:
     global AGENT_V2_RUNTIME
     if AGENT_V2_RUNTIME is None:
-        store = RuntimeStore(RUNTIME_V2_DIR)
+        research_store = get_research_store()
+        store = RuntimeStore(
+            RUNTIME_V2_DIR,
+            read_only=research_store.read_only,
+            database_schema=research_store.schema_version,
+            supported_schema=research_store.compatibility_status()["supported_schema_version"],
+        )
         AGENT_V2_RUNTIME = AgentRuntimeV2(
             store,
             RuntimeDependencies(
@@ -5588,6 +5602,7 @@ def get_campaign_service() -> CampaignService:
             load_thread=load_thread, prepare_operation_batch=v2_prepare_operation_batch,
             apply_operation_batch=v2_apply_operation_batch,
             planner=lambda prompt: campaign_plan_model(prompt) or "",
+            read_only=runtime.store.read_only,
         )
     return CAMPAIGN_SERVICE
 

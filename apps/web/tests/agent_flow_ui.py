@@ -40,14 +40,24 @@ def current_agent_task_id(page: Page) -> str:
 
 def wait_for_current_agent(page: Page) -> None:
     page.locator(".conversation-turn.agent-turn").last.wait_for(state="visible", timeout=20_000)
-    page.wait_for_function(
-        """() => {
-          const turns = document.querySelectorAll('.conversation-turn.agent-turn');
-          const latest = turns[turns.length - 1];
-          return latest && !['pending', 'streaming'].includes(latest.dataset.messageStatus);
-        }""",
-        timeout=30_000,
-    )
+    try:
+        page.wait_for_function(
+            """() => {
+              const turns = document.querySelectorAll('.conversation-turn.agent-turn');
+              const latest = turns[turns.length - 1];
+              return latest && !['pending', 'streaming'].includes(latest.dataset.messageStatus);
+            }""",
+            timeout=30_000,
+        )
+    except Exception:
+        latest = page.locator(".conversation-turn.agent-turn").last
+        diagnostic = {
+            "task_id": latest.get_attribute("data-agent-task-id"),
+            "message_status": latest.get_attribute("data-message-status"),
+            "text": latest.inner_text()[:1200],
+        }
+        print(json.dumps({"agent_wait_timeout": diagnostic}, ensure_ascii=False), file=sys.stderr)
+        raise
 
 
 def wait_for_new_agent(page: Page, previous_task_id: str = "") -> None:

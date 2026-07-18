@@ -23,6 +23,11 @@ def create_campaign_router(get_service) -> APIRouter:
     def service() -> CampaignService:
         return get_service()
 
+    def writable_service() -> CampaignService:
+        selected = service()
+        selected.ensure_writable()
+        return selected
+
     @router.get("/campaigns/runtime")
     def campaign_runtime():
         return service().runtime_status()
@@ -33,8 +38,9 @@ def create_campaign_router(get_service) -> APIRouter:
 
     @router.post("/campaign-runtime/install")
     def campaign_runtime_install(profile: str = "cpu"):
+        selected = writable_service()
         try:
-            return service().install_runtime(profile)
+            return selected.install_runtime(profile)
         except (ValueError, RuntimeError) as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
 
@@ -47,7 +53,7 @@ def create_campaign_router(get_service) -> APIRouter:
 
     @router.post("/campaign-runtime/cancel")
     def campaign_runtime_cancel():
-        return service().cancel_runtime_install()
+        return writable_service().cancel_runtime_install()
 
     @router.get("/threads/{thread_id}/campaigns")
     def list_campaigns(thread_id: str):
@@ -65,7 +71,7 @@ def create_campaign_router(get_service) -> APIRouter:
     @router.post("/threads/{thread_id}/campaigns")
     def create_campaign(thread_id: str, payload: CampaignCreateRequest):
         try:
-            return service().create(
+            return writable_service().create(
                 thread_id, payload.idea, payload.source_node_ids, payload.budget, payload.workspace_seed
             ).model_dump(mode="json")
         except KeyError as exc:
@@ -91,7 +97,7 @@ def create_campaign_router(get_service) -> APIRouter:
 
     def action(campaign_id: str, name: str):
         try:
-            return getattr(service(), name)(campaign_id).model_dump(mode="json")
+            return getattr(writable_service(), name)(campaign_id).model_dump(mode="json")
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except ValueError as exc:
@@ -112,10 +118,11 @@ def create_campaign_router(get_service) -> APIRouter:
     @router.post("/campaigns/{campaign_id}/stages/{stage_id}/advance")
     def advance(campaign_id: str, stage_id: str, payload: StageAdvanceRequest):
         try:
-            snapshot = service().get(campaign_id)
+            selected = writable_service()
+            snapshot = selected.get(campaign_id)
             if not snapshot or snapshot.campaign.current_stage_id != stage_id:
                 raise KeyError("Campaign stage not found")
-            return service().advance(campaign_id, payload.branch_id).model_dump(mode="json")
+            return selected.advance(campaign_id, payload.branch_id).model_dump(mode="json")
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except ValueError as exc:
@@ -144,7 +151,7 @@ def create_campaign_router(get_service) -> APIRouter:
     @router.post("/campaigns/{campaign_id}/branches/{branch_id}/prepare-execution")
     def prepare_execution(campaign_id: str, branch_id: str):
         try:
-            return service().prepare_execution(campaign_id, branch_id)
+            return writable_service().prepare_execution(campaign_id, branch_id)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except ValueError as exc:
@@ -166,7 +173,7 @@ def create_campaign_router(get_service) -> APIRouter:
     @router.post("/campaigns/{campaign_id}/manuscripts/generate")
     def generate_manuscript(campaign_id: str, payload: ManuscriptGenerateRequest):
         try:
-            return service().generate_manuscript(campaign_id, payload).model_dump(mode="json")
+            return writable_service().generate_manuscript(campaign_id, payload).model_dump(mode="json")
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except ValueError as exc:
@@ -175,14 +182,14 @@ def create_campaign_router(get_service) -> APIRouter:
     @router.post("/campaigns/{campaign_id}/reviews/start")
     def start_review(campaign_id: str, payload: ReviewStartRequest):
         try:
-            return service().start_review(campaign_id, payload).model_dump(mode="json")
+            return writable_service().start_review(campaign_id, payload).model_dump(mode="json")
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @router.post("/campaigns/{campaign_id}/revisions/apply")
     def apply_revision(campaign_id: str, payload: RevisionApplyRequest):
         try:
-            return service().apply_revision(campaign_id, payload).model_dump(mode="json")
+            return writable_service().apply_revision(campaign_id, payload).model_dump(mode="json")
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except ValueError as exc:
@@ -191,7 +198,7 @@ def create_campaign_router(get_service) -> APIRouter:
     @router.post("/campaigns/{campaign_id}/release/export")
     def export_release(campaign_id: str, payload: ReleaseExportRequest):
         try:
-            return service().export_release(campaign_id, payload)
+            return writable_service().export_release(campaign_id, payload)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except ValueError as exc:
@@ -216,7 +223,7 @@ def create_campaign_router(get_service) -> APIRouter:
     @router.post("/campaigns/{campaign_id}/branches/{branch_id}/promote")
     def promote(campaign_id: str, branch_id: str, payload: BranchPromoteRequest):
         try:
-            return service().promote(campaign_id, branch_id, payload)
+            return writable_service().promote(campaign_id, branch_id, payload)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except ValueError as exc:
@@ -225,7 +232,7 @@ def create_campaign_router(get_service) -> APIRouter:
     @router.post("/campaigns/{campaign_id}/branches/{branch_id}/discard")
     def discard(campaign_id: str, branch_id: str):
         try:
-            return service().discard(campaign_id, branch_id).model_dump(mode="json")
+            return writable_service().discard(campaign_id, branch_id).model_dump(mode="json")
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 

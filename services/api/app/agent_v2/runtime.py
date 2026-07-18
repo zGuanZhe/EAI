@@ -202,10 +202,14 @@ class AgentRuntimeV2:
         self._cancelled: set[str] = set()
         self._lock = threading.RLock()
         self._closed = False
-        self._checkpoint_connection = sqlite3.connect(store.db_path, check_same_thread=False)
+        self._checkpoint_connection = sqlite3.connect(
+            ":memory:" if store.read_only else store.db_path,
+            check_same_thread=False,
+        )
         self._checkpointer = SqliteSaver(self._checkpoint_connection)
         self._graph = self._build_graph()
-        self.store.mark_incomplete_interrupted(utc_now())
+        if not store.read_only:
+            self.store.mark_incomplete_interrupted(utc_now())
 
     def _build_graph(self):
         graph = StateGraph(RuntimeState)
@@ -286,6 +290,7 @@ class AgentRuntimeV2:
         parent_task_id: str | None = None,
         task_id: str | None = None,
     ) -> AgentTask:
+        self.store.ensure_writable()
         now = utc_now()
         budget = budget_for_request(request)
         attempt_id = new_id("attempt")
@@ -367,6 +372,7 @@ class AgentRuntimeV2:
                 self._threads.pop(task_id, None)
 
     def cancel(self, task_id: str) -> AgentTask:
+        self.store.ensure_writable()
         task = self._task(task_id)
         if task.status in self.TERMINAL:
             return task
@@ -394,6 +400,7 @@ class AgentRuntimeV2:
         return task
 
     def steer(self, task_id: str, message: str) -> AgentTask:
+        self.store.ensure_writable()
         task = self._task(task_id)
         if task.status not in {"pending", "running"}:
             raise ValueError("只有正在运行的任务可以追加要求")
@@ -405,6 +412,7 @@ class AgentRuntimeV2:
         return task
 
     def resume(self, task_id: str, resolution: ApprovalResolveRequest | None = None) -> AgentTask:
+        self.store.ensure_writable()
         task = self._task(task_id)
         if task.status not in {"waiting_approval", "interrupted", "failed", "done"}:
             raise ValueError("task is not resumable")
@@ -455,6 +463,7 @@ class AgentRuntimeV2:
         return task
 
     def resolve_approval(self, approval_id: str, resolution: ApprovalResolveRequest) -> tuple[ApprovalRequest, AgentTask]:
+        self.store.ensure_writable()
         approval = self.store.get_approval(approval_id)
         if not approval:
             raise KeyError("approval not found")

@@ -30,6 +30,7 @@ $WebPort = Get-FreePort
 $Python = Join-Path $Root "services\api\.venv\Scripts\python.exe"
 $Backend = $null
 $Frontend = $null
+$Succeeded = $false
 $OldOpenAI = $env:OPENAI_API_KEY
 $OldOpenRouter = $env:OPENROUTER_API_KEY
 $OldMockResponse = $env:EAI_VNEXT_MOCK_OPENAI_RESPONSE
@@ -66,6 +67,7 @@ try {
     $env:EAI_API_URL = "http://127.0.0.1:$ApiPort/api/vnext"
     & $Python (Join-Path $Root "apps\web\tests\agent_flow_ui.py")
     if ($LASTEXITCODE -ne 0) { throw "Playwright web E2E failed. Logs: $Logs" }
+    $Succeeded = $true
 } finally {
     if ($Frontend) { Stop-ProcessTree $Frontend.Id }
     if ($Backend) { Stop-ProcessTree $Backend.Id }
@@ -75,7 +77,17 @@ try {
     if ($null -ne $OldOpenRouter) { $env:OPENROUTER_API_KEY = $OldOpenRouter } else { Remove-Item Env:OPENROUTER_API_KEY -ErrorAction SilentlyContinue }
     if ($null -ne $OldMockResponse) { $env:EAI_VNEXT_MOCK_OPENAI_RESPONSE = $OldMockResponse } else { Remove-Item Env:EAI_VNEXT_MOCK_OPENAI_RESPONSE -ErrorAction SilentlyContinue }
     if ($null -ne $OldCapabilityDelay) { $env:EAI_V2_MOCK_CAPABILITY_DELAY_MS = $OldCapabilityDelay } else { Remove-Item Env:EAI_V2_MOCK_CAPABILITY_DELAY_MS -ErrorAction SilentlyContinue }
-    if (Test-Path $AuditRoot) {
+    if (-not $Succeeded -and (Test-Path $Logs)) {
+        Write-Warning "Preserving failed E2E artifacts: $AuditRoot"
+        foreach ($LogName in @("backend.err.log", "backend.out.log", "web.err.log", "web.out.log")) {
+            $LogPath = Join-Path $Logs $LogName
+            if (Test-Path $LogPath) {
+                Write-Host "--- $LogName (tail) ---"
+                Get-Content -LiteralPath $LogPath -Tail 80
+            }
+        }
+    }
+    if ($Succeeded -and (Test-Path $AuditRoot)) {
         $resolved = (Resolve-Path -LiteralPath $AuditRoot).Path
         $temp = (Resolve-Path -LiteralPath $env:TEMP).Path
         if ($resolved.StartsWith($temp, [System.StringComparison]::OrdinalIgnoreCase) -and (Split-Path -Leaf $resolved) -like "eai-web-e2e-*") {

@@ -108,6 +108,41 @@ class AgentRuntimeV2Test(unittest.TestCase):
         self.assertNotIn("specialist_started", [event.kind for event in events])
         self.assertNotIn("source_found", [event.kind for event in events])
 
+    def test_sse_contract_preserves_event_names_sequence_and_reconnect(self):
+        os.environ["EAI_VNEXT_MOCK_OPENAI_RESPONSE"] = "SSE contract response."
+        thread = self.create_thread("SSE contract")
+        started = self.client.post(
+            f"/api/vnext/threads/{thread['id']}/agent-v2/turns",
+            json={"message": "你好", "intent_override": "auto"},
+        )
+        self.assertEqual(started.status_code, 200, started.text)
+        task_id = started.json()["task"]["id"]
+        self.wait_task(task_id, {"done"})
+
+        streamed = self.client.get(f"/api/vnext/agent-v2/tasks/{task_id}/events")
+        self.assertEqual(streamed.status_code, 200, streamed.text)
+        self.assertTrue(streamed.headers["content-type"].startswith("text/event-stream"))
+        events = []
+        for block in streamed.text.strip().split("\n\n"):
+            lines = block.splitlines()
+            kind = next(line.split(":", 1)[1].strip() for line in lines if line.startswith("event:"))
+            payload = json.loads(next(line.split(":", 1)[1].strip() for line in lines if line.startswith("data:")))
+            self.assertEqual(kind, payload["kind"])
+            events.append(payload)
+        sequences = [event["seq"] for event in events]
+        self.assertEqual(sequences, sorted(set(sequences)))
+        self.assertIn("answer_ready", [event["kind"] for event in events])
+        self.assertEqual(events[-1]["kind"], "done")
+
+        cursor = sequences[len(sequences) // 2]
+        replayed = self.client.get(f"/api/vnext/agent-v2/tasks/{task_id}/events?after_seq={cursor}")
+        replayed_events = [
+            json.loads(next(line.split(":", 1)[1].strip() for line in block.splitlines() if line.startswith("data:")))
+            for block in replayed.text.strip().split("\n\n")
+            if block.strip()
+        ]
+        self.assertEqual([event["seq"] for event in replayed_events], [seq for seq in sequences if seq > cursor])
+
     def test_structured_provider_payload_never_flashes_protocol_json(self):
         os.environ["EAI_VNEXT_MOCK_OPENAI_RESPONSE"] = '```json\n{"answer":"Structured natural answer.","tool_calls":[{"name":"forbidden"}]}\n```'
         thread = self.create_thread()

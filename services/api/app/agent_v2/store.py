@@ -6,6 +6,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
+from ..core.errors import SchemaReadOnlyError
 from .models import (
     AgentArtifact,
     AgentAttempt,
@@ -21,18 +22,45 @@ from .models import (
 
 
 class RuntimeStore:
-    def __init__(self, runtime_dir: Path):
+    def __init__(
+        self,
+        runtime_dir: Path,
+        *,
+        read_only: bool = False,
+        database_schema: int = 0,
+        supported_schema: int = 0,
+    ):
         self.runtime_dir = runtime_dir
-        self.runtime_dir.mkdir(parents=True, exist_ok=True)
+        self.read_only = read_only
+        self.database_schema = database_schema
+        self.supported_schema = supported_schema
+        if not read_only:
+            self.runtime_dir.mkdir(parents=True, exist_ok=True)
         self.documents_dir = self.runtime_dir / "documents"
         self.workspaces_dir = self.runtime_dir / "workspaces"
-        self.documents_dir.mkdir(parents=True, exist_ok=True)
-        self.workspaces_dir.mkdir(parents=True, exist_ok=True)
+        if not read_only:
+            self.documents_dir.mkdir(parents=True, exist_ok=True)
+            self.workspaces_dir.mkdir(parents=True, exist_ok=True)
         self.db_path = self.runtime_dir / "runtime.db"
         self._lock = threading.RLock()
-        self._connection = sqlite3.connect(self.db_path, check_same_thread=False)
+        if read_only and self.db_path.exists():
+            self._connection = sqlite3.connect(
+                f"{self.db_path.resolve().as_uri()}?mode=ro",
+                uri=True,
+                check_same_thread=False,
+            )
+        else:
+            self._connection = sqlite3.connect(":memory:" if read_only else self.db_path, check_same_thread=False)
         self._connection.row_factory = sqlite3.Row
-        self._initialize()
+        if not read_only or not self.db_path.exists():
+            self._initialize()
+
+    def ensure_writable(self) -> None:
+        if self.read_only:
+            raise SchemaReadOnlyError(
+                database_schema=self.database_schema,
+                supported_schema=self.supported_schema,
+            )
 
     def _initialize(self) -> None:
         with self._lock, self._connection:

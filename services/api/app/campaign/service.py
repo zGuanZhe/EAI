@@ -72,6 +72,7 @@ class CampaignService:
         prepare_operation_batch: Callable[[OperationBatch], OperationBatch],
         apply_operation_batch: Callable[[OperationBatch, ApprovalResolveRequest], dict[str, Any]],
         planner: Callable[[str], str] | None = None,
+        read_only: bool = False,
     ):
         self.research_store = research_store
         self.runtime_store = runtime_store
@@ -82,7 +83,8 @@ class CampaignService:
         self.evidence = EAIEvidenceBackend(research_store.search)
         self.execution = EAIExecutionBackend()
         self.publication = PublicationService(planner)
-        self.runtime = CampaignRuntimeManager(runtime_store.runtime_dir)
+        self.read_only = read_only
+        self.runtime = CampaignRuntimeManager(runtime_store.runtime_dir, read_only=read_only)
         self._lock = threading.RLock()
         self._workers: dict[str, threading.Thread] = {}
         personal_dir = getattr(self.research_store, "personal_dir", None)
@@ -93,8 +95,11 @@ class CampaignService:
                 save_snapshot=self._save_imported_snapshot,
                 now=utc_now(),
             )
-            if personal_dir else {"found": 0, "imported": 0, "unchanged": 0, "failed": 0}
+            if personal_dir and not read_only else {"found": 0, "imported": 0, "unchanged": 0, "failed": 0}
         )
+
+    def ensure_writable(self) -> None:
+        self.research_store.ensure_writable()
 
     def _save_imported_snapshot(self, snapshot: CampaignSnapshot) -> None:
         self.research_store.save_record(

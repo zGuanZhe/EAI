@@ -44,7 +44,8 @@ export function Sidebar({
   onSwitchSurface,
   activeAtlas,
   activeSurface,
-  isRunning = false
+  isRunning = false,
+  readOnly = false
 }) {
   const [atlasPickerOpen, setAtlasPickerOpen] = useState(false);
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
@@ -98,7 +99,7 @@ export function Sidebar({
         </button>
       </div>
 
-      <button className="sidebar-primary-action" type="button" onClick={onCreateThread}>
+      <button className="sidebar-primary-action" type="button" onClick={onCreateThread} disabled={readOnly}>
         <Plus size={17} /> <span>新建研究问题</span>
       </button>
 
@@ -137,6 +138,7 @@ export function Sidebar({
                     className="project-delete"
                     type="button"
                     title="删除成果目标"
+                    disabled={readOnly}
                     onClick={() => {
                       onDeleteProject(project.id);
                       setProjectPickerOpen(false);
@@ -147,7 +149,7 @@ export function Sidebar({
                 )}
               </article>
             ))}
-            <button className="project-new" type="button" onClick={onCreateProject}>
+            <button className="project-new" type="button" onClick={onCreateProject} disabled={readOnly}>
               <Plus size={14} /> 新建成果目标
             </button>
           </div>
@@ -194,6 +196,7 @@ export function Sidebar({
                     key={atlas.id}
                     type="button"
                     className={cx(activeAtlas === atlas.id && "active")}
+                    disabled={readOnly}
                     onClick={() => {
                       onSetAtlas(atlas.id);
                       setAtlasPickerOpen(false);
@@ -222,7 +225,7 @@ export function Sidebar({
                   <span>{displayThreadTitle(item.title)}</span>
                   <small>{item.context_count} 材料 · Atlas {item.active_atlas_id}</small>
                 </button>
-                <button className="thread-delete" type="button" title="删除研究问题" onClick={() => onDeleteThread(item.id)}>
+                <button className="thread-delete" type="button" title="删除研究问题" onClick={() => onDeleteThread(item.id)} disabled={readOnly}>
                   <Trash2 size={13} />
                 </button>
               </article>

@@ -21,7 +21,8 @@ export function Composer({
   attachments = [],
   onRemoveAttachment,
   intentMode = "auto",
-  onIntentModeChange
+  onIntentModeChange,
+  readOnly = false
 }) {
   const commandQuery = value.startsWith("/") ? value.trim().toLowerCase() : "";
   const [dismissedCommand, setDismissedCommand] = useState("");
@@ -152,12 +153,13 @@ export function Composer({
           value={value}
           onChange={(event) => setValue(event.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={isRunning ? "追加要求或纠正方向..." : intentMode === "execute" ? "描述要在沙箱中执行的任务，命令会逐次请求确认..." : COMPOSER_COPY.placeholder}
+          placeholder={readOnly ? "当前版本以只读模式打开此研究数据库" : isRunning ? "追加要求或纠正方向..." : intentMode === "execute" ? "描述要在沙箱中执行的任务，命令会逐次请求确认..." : COMPOSER_COPY.placeholder}
           rows={1}
+          disabled={readOnly}
         />
         <label className="composer-mode-select" title="选择 Main Agent 本轮工作方式">
           <span className="sr-only">本轮工作方式</span>
-          <select value={intentMode} onChange={(event) => onIntentModeChange?.(event.target.value)} aria-label="本轮工作方式">
+          <select value={intentMode} onChange={(event) => onIntentModeChange?.(event.target.value)} aria-label="本轮工作方式" disabled={readOnly}>
             <option value="auto">自动</option>
             <option value="chat">仅聊天</option>
             <option value="local">仅本地</option>
@@ -167,7 +169,7 @@ export function Composer({
         </label>
         <div className="composer-run-actions">
           {isRunning && <button type="button" className="send-button stop" title="停止 Main Agent" onClick={onStop}><Square size={14} /></button>}
-          <button type="submit" className="send-button" title={isRunning ? "追加要求" : COMPOSER_COPY.sendTitle} disabled={!value.trim()}><Send size={16} /></button>
+          <button type="submit" className="send-button" title={isRunning ? "追加要求" : COMPOSER_COPY.sendTitle} disabled={readOnly || !value.trim()}><Send size={16} /></button>
         </div>
       </form>
     </div>

@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
+from ..core.errors import SchemaReadOnlyError
 from .models import ClaimRecord, EvidenceBundle, EvidenceSpan, KnowledgeStatus, ResearchWork, SyncJob
 from .ontology import ontology_packs
 from .embeddings import DIMENSIONS, PROFILE_ID, LocalEmbeddingProfile
@@ -115,13 +116,23 @@ class ResearchStore:
         self._lock = threading.RLock()
         self._connection: sqlite3.Connection | None = None
         self._active_calls = 0
+        self.schema_version = 0
+        self.read_only = False
         self._open_connection()
         startup_backup: Path | None = None
         try:
             previous_version = self._current_schema_version()
+            self.schema_version = previous_version
+            if previous_version > SCHEMA_VERSION:
+                self.read_only = True
+                self.close()
+                self._open_connection()
+                self.close()
+                return
             if previous_version and previous_version < SCHEMA_VERSION:
                 startup_backup = self._backup_database_handle(f"schema-v{previous_version}-to-v{SCHEMA_VERSION}")
             self._initialize()
+            self.schema_version = SCHEMA_VERSION
             self.bootstrap()
             self._open_connection()
             self._write_index_manifest()
@@ -167,12 +178,35 @@ class ResearchStore:
 
     def _open_connection(self) -> sqlite3.Connection:
         if self._connection is None:
-            connection = sqlite3.connect(self.db_path, check_same_thread=False, timeout=30)
+            if self.read_only:
+                connection = sqlite3.connect(
+                    f"{self.db_path.as_uri()}?mode=ro",
+                    uri=True,
+                    check_same_thread=False,
+                    timeout=30,
+                )
+            else:
+                connection = sqlite3.connect(self.db_path, check_same_thread=False, timeout=30)
             connection.row_factory = sqlite3.Row
             connection.execute("PRAGMA foreign_keys=ON")
             connection.execute("PRAGMA busy_timeout=30000")
             self._connection = connection
         return self._connection
+
+    def compatibility_status(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "supported_schema_version": SCHEMA_VERSION,
+            "read_only": self.read_only,
+            "reason": "schema_newer_than_app" if self.read_only else "",
+        }
+
+    def ensure_writable(self) -> None:
+        if self.read_only:
+            raise SchemaReadOnlyError(
+                database_schema=self.schema_version,
+                supported_schema=SCHEMA_VERSION,
+            )
 
     def _enter_call(self) -> None:
         with self._lock:
@@ -200,6 +234,7 @@ class ResearchStore:
 
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
+        self.ensure_writable()
         with self._lock:
             connection = self._open_connection()
             try:

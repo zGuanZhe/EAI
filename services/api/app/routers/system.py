@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Callable
 
 from fastapi import APIRouter
 
@@ -14,6 +15,7 @@ def create_system_router(
     personal_dir: Path,
     atlas_cache_dir: Path,
     secret_candidates: list[Path | None],
+    research_status: Callable[[], dict[str, object]] | None = None,
 ) -> APIRouter:
     router = APIRouter(prefix="/api/vnext", tags=["system"])
 
@@ -33,6 +35,7 @@ def create_system_router(
             personal_dir=personal_dir,
             atlas_cache_dir=atlas_cache_dir,
             secret_candidates=secret_candidates,
+            research_status=research_status,
         )
 
     return router

@@ -8,6 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from .core.errors import SchemaReadOnlyError
+
 
 class DesktopSessionMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -20,7 +22,7 @@ class DesktopSessionMiddleware(BaseHTTPMiddleware):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="EAI Desktop Service", version="0.2.0")
+    app = FastAPI(title="EAI Desktop Service", version="0.4.1")
     app.add_middleware(DesktopSessionMiddleware)
     app.add_middleware(
         CORSMiddleware,
@@ -35,4 +37,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.exception_handler(SchemaReadOnlyError)
+    async def schema_read_only_handler(_request: Request, error: SchemaReadOnlyError):
+        return JSONResponse(status_code=409, content={"detail": error.detail})
+
     return app

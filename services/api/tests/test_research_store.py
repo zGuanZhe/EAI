@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import tempfile
 import unittest
 import time
@@ -9,6 +10,7 @@ from pathlib import Path
 from app.research.documents import import_document
 from app.research.enrichment import KnowledgeEnrichmentService
 from app.research.store import ResearchStore
+from app.core.errors import SchemaReadOnlyError
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -38,6 +40,41 @@ class ResearchStoreTest(unittest.TestCase):
             "works": 686, "placements": 907, "routes": 113, "relations": 1556,
         })
         self.assertTrue(self.store.integrity_check()["ok"])
+
+    def test_newer_schema_reopens_read_only_and_preserves_database_bytes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            research_dir = root / "research"
+            personal_dir = root / "personal"
+            store = ResearchStore(research_dir, ATLAS_DIR, personal_dir)
+            store.save_record("thread", "thread-newer", {"id": "thread-newer", "title": "Readable"})
+            store.close()
+
+            database = research_dir / "research.db"
+            connection = sqlite3.connect(database)
+            connection.execute(
+                "INSERT INTO schema_migrations(version, applied_at, summary) VALUES(4, 'future', 'future schema')"
+            )
+            connection.commit()
+            connection.close()
+            before = database.read_bytes()
+
+            read_only = ResearchStore(research_dir, ATLAS_DIR, personal_dir)
+            self.assertEqual(
+                read_only.compatibility_status(),
+                {
+                    "schema_version": 4,
+                    "supported_schema_version": 3,
+                    "read_only": True,
+                    "reason": "schema_newer_than_app",
+                },
+            )
+            self.assertEqual(read_only.get_record("thread", "thread-newer")["title"], "Readable")
+            with self.assertRaises(SchemaReadOnlyError):
+                read_only.save_record("thread", "thread-newer", {"id": "thread-newer", "title": "Blocked"})
+            read_only.close()
+
+            self.assertEqual(database.read_bytes(), before)
 
     def test_identity_resolution_and_graph_neighborhood(self):
         work = next(item for item in self.store.works_for_sync() if item["identifiers"].get("arxiv"))

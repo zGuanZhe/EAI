@@ -235,6 +235,7 @@ export function App() {
   const [activeProposalId, setActiveProposalId] = useState(null);
   const [activeChangesetId, setActiveChangesetId] = useState(null);
   const [atlasFocusPaperId, setAtlasFocusPaperId] = useState(null);
+  const researchReadOnly = Boolean(systemInfo?.research_store?.read_only);
   const {
     attachments: turnAttachments,
     addAttachment: addTurnAttachment,
@@ -1434,6 +1435,10 @@ export function App() {
 
   async function onComposerSubmit(event) {
     event.preventDefault();
+    if (researchReadOnly) {
+      setStatus("当前版本以只读模式打开研究数据库，不能创建新消息。");
+      return;
+    }
     const text = composer.trim();
     if (!text) return;
     try {
@@ -1493,7 +1498,7 @@ export function App() {
   }
 
   return (
-    <div className={cx("app", isHome && "home-mode", !sidebarOpen && "sidebar-collapsed", !isHome && railOpen && "inspector-open", !isHome && !railOpen && "rail-collapsed")}>
+    <div className={cx("app", isHome && "home-mode", researchReadOnly && "research-read-only", !sidebarOpen && "sidebar-collapsed", !isHome && railOpen && "inspector-open", !isHome && !railOpen && "rail-collapsed")}>
       <Sidebar
         collapsed={!sidebarOpen}
         onToggleSidebar={() => setSidebarOpen((value) => !value)}
@@ -1520,9 +1525,17 @@ export function App() {
         activeAtlas={thread.active_atlas_id}
         activeSurface={toolsPage ? "tools" : surface}
         isRunning={isRunning}
+        readOnly={researchReadOnly}
       />
 
       <main className={cx("main", isHome && "home-main", !isHome && surface === "thread" && !toolsPage && "thread-main-shell")}>
+        {researchReadOnly && (
+          <div className="research-read-only-banner" role="status">
+            <InlineNotice tone="warning" title="只读模式">
+              数据库 schema {systemInfo.research_store.schema_version} 高于当前支持的 {systemInfo.research_store.supported_schema_version}；浏览和导出可用，写入与执行已停用。
+            </InlineNotice>
+          </div>
+        )}
         {isHome ? (
           <HomeSurface
             thread={thread}
@@ -1553,6 +1566,7 @@ export function App() {
                 onRemoveAttachment={removeTurnAttachment}
                 intentMode={agentMode}
                 onIntentModeChange={setAgentMode}
+                readOnly={researchReadOnly}
               />
             )}
           />
@@ -1672,6 +1686,7 @@ export function App() {
           onRemoveAttachment={removeTurnAttachment}
           intentMode={agentMode}
           onIntentModeChange={setAgentMode}
+          readOnly={researchReadOnly}
         />}
       </main>
 

@@ -27,9 +27,10 @@ def hidden_process_flags() -> int:
 class CampaignRuntimeManager:
     """Builds and reports the isolated AI Scientist runtime without exposing a terminal."""
 
-    def __init__(self, runtime_dir: Path, source_dir: Path | None = None):
+    def __init__(self, runtime_dir: Path, source_dir: Path | None = None, *, read_only: bool = False):
         self.runtime_dir = runtime_dir / "campaign-runtime"
-        self.runtime_dir.mkdir(parents=True, exist_ok=True)
+        if not read_only:
+            self.runtime_dir.mkdir(parents=True, exist_ok=True)
         root = Path(__file__).resolve().parents[4]
         configured_source = os.environ.get("EAI_CAMPAIGN_SOURCE_DIR")
         self.source_dir = (source_dir or (Path(configured_source) if configured_source else root / "third_party" / "ai-scientist-v2")).resolve()

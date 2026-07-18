@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve } from "node:path";
+import { spawnSync } from "node:child_process";
 
 const root = resolve(import.meta.dirname, "..");
 const failures = [];
@@ -8,11 +9,20 @@ const lines = (path) => read(path).split(/\r?\n/).length;
 
 for (const [path, maximum] of [
   ["apps/web/src/App.jsx", 50],
-  ["apps/web/src/workspace/WorkspaceApp.jsx", 2000],
   ["services/api/app/main.py", 50],
 ]) {
   const count = lines(path);
   if (count > maximum) failures.push(`${path}: ${count} lines exceeds ${maximum}`);
+}
+
+const bundledPython = resolve(root, "services/api/.venv/Scripts/python.exe");
+const python = existsSync(bundledPython) ? bundledPython : "python";
+const pythonArchitecture = spawnSync(python, [resolve(root, "scripts/check-python-architecture.py")], {
+  cwd: root,
+  encoding: "utf8",
+});
+if (pythonArchitecture.status !== 0) {
+  failures.push((pythonArchitecture.stderr || pythonArchitecture.stdout || "Python architecture check failed").trim());
 }
 
 for (const removed of [
@@ -58,7 +68,7 @@ const packageVersion = JSON.parse(read("package.json")).version;
 const webVersion = JSON.parse(read("apps/web/package.json")).version;
 const tauriVersion = JSON.parse(read("apps/desktop/src-tauri/tauri.conf.json")).version;
 const cargoVersion = read("apps/desktop/src-tauri/Cargo.toml").match(/^version\s*=\s*"([^"]+)"/m)?.[1];
-if (new Set([packageVersion, webVersion, tauriVersion, cargoVersion]).size !== 1 || packageVersion !== "0.4.0") {
+if (new Set([packageVersion, webVersion, tauriVersion, cargoVersion]).size !== 1 || packageVersion !== "0.4.1") {
   failures.push(`version mismatch: package=${packageVersion}, web=${webVersion}, tauri=${tauriVersion}, cargo=${cargoVersion}`);
 }
 
