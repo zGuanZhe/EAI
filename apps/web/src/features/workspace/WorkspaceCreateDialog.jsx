@@ -39,7 +39,7 @@ export function WorkspaceCreateDialog({
     if (appRoot) appRoot.inert = true;
 
     const handleKeyDown = (event) => {
-      if (event.key === "Escape" && !required && !submittingRef.current) onCancelRef.current?.();
+      if (event.key === "Escape" && !submittingRef.current) onCancelRef.current?.();
       if (event.key !== "Tab" || !dialogRef.current) return;
       const focusable = [...dialogRef.current.querySelectorAll(FOCUSABLE)];
       if (!focusable.length) return;
@@ -62,7 +62,7 @@ export function WorkspaceCreateDialog({
       if (appRoot) appRoot.inert = false;
       previousFocusRef.current?.focus?.();
     };
-  }, [required]);
+  }, []);
 
   async function submit(event) {
     event.preventDefault();
@@ -94,7 +94,7 @@ export function WorkspaceCreateDialog({
     <div
       className="workspace-create-layer"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !required && !submitting) onCancel?.();
+        if (event.target === event.currentTarget && !submitting) onCancel?.();
       }}
     >
       <section
@@ -111,11 +111,9 @@ export function WorkspaceCreateDialog({
             <h2 id={titleId}>{heading}</h2>
             <p id={descriptionId}>{description}</p>
           </div>
-          {!required && (
-            <IconButton label="关闭创建窗口" onClick={onCancel} disabled={submitting}>
-              <X size={17} />
-            </IconButton>
-          )}
+          <IconButton label="关闭创建窗口" onClick={onCancel} disabled={submitting}>
+            <X size={17} />
+          </IconButton>
         </header>
 
         <form onSubmit={submit}>
@@ -154,7 +152,7 @@ export function WorkspaceCreateDialog({
           </label>
           {error && <div className="workspace-create-error" role="alert">{error}</div>}
           <footer>
-            {!required && <Button onClick={onCancel} disabled={submitting}>取消</Button>}
+            <Button onClick={onCancel} disabled={submitting}>取消</Button>
             <Button variant="primary" type="submit" disabled={submitting}>
               {submitting ? "正在创建..." : isProject ? "创建成果目标" : "创建研究问题"}
             </Button>

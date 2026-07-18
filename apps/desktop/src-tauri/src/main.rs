@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File},
     io::Write,
@@ -13,6 +13,7 @@ use tauri_plugin_shell::{
     process::{CommandChild, CommandEvent},
     ShellExt,
 };
+use url::{Host, Url};
 
 #[derive(Clone, Serialize)]
 struct RuntimeInfo {
@@ -22,6 +23,25 @@ struct RuntimeInfo {
     personal_dir: String,
     atlas_cache_dir: String,
     log_dir: String,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+struct ProviderConfig {
+    provider: String,
+    base_url: String,
+    model: String,
+    api_format: String,
+}
+
+impl Default for ProviderConfig {
+    fn default() -> Self {
+        Self {
+            provider: "openai".into(),
+            base_url: "https://api.openai.com/v1".into(),
+            model: "gpt-4.1-mini".into(),
+            api_format: "responses".into(),
+        }
+    }
 }
 
 #[derive(Default)]
@@ -101,6 +121,101 @@ fn credential(provider: &str) -> Option<String> {
         .filter(|value| !value.trim().is_empty())
 }
 
+fn provider_key(provider: &str) -> Option<String> {
+    credential(provider).or_else(|| {
+        let variable = if provider == "openrouter" {
+            "OPENROUTER_API_KEY"
+        } else {
+            "OPENAI_API_KEY"
+        };
+        std::env::var(variable)
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+    })
+}
+
+fn default_provider_config() -> ProviderConfig {
+    let explicit_openai = std::env::var("OPENAI_BASE_URL").is_ok()
+        || (provider_key("openai").is_some() && provider_key("openrouter").is_none());
+    if explicit_openai {
+        ProviderConfig {
+            provider: "openai".into(),
+            base_url: std::env::var("OPENAI_BASE_URL")
+                .unwrap_or_else(|_| "https://api.openai.com/v1".into()),
+            model: std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4.1-mini".into()),
+            api_format: std::env::var("OPENAI_API_FORMAT").unwrap_or_else(|_| "responses".into()),
+        }
+    } else {
+        ProviderConfig {
+            provider: "openrouter".into(),
+            base_url: std::env::var("OPENROUTER_BASE_URL")
+                .unwrap_or_else(|_| "https://openrouter.ai/api/v1".into()),
+            model: std::env::var("OPENROUTER_MODEL").unwrap_or_else(|_| "openrouter/auto".into()),
+            api_format: "chat".into(),
+        }
+    }
+}
+
+fn validate_provider_config(mut config: ProviderConfig) -> Result<ProviderConfig, String> {
+    config.provider = config.provider.trim().to_lowercase();
+    config.base_url = config.base_url.trim().trim_end_matches('/').to_string();
+    config.model = config.model.trim().to_string();
+    config.api_format = config.api_format.trim().to_lowercase();
+    if !matches!(config.provider.as_str(), "openrouter" | "openai") {
+        return Err("无效的 Provider".into());
+    }
+    if config.model.is_empty() || config.model.len() > 160 {
+        return Err("模型名称不能为空且不能超过 160 个字符".into());
+    }
+    if !matches!(config.api_format.as_str(), "chat" | "responses") {
+        return Err("API 格式必须是 chat 或 responses".into());
+    }
+    let parsed = Url::parse(&config.base_url).map_err(|_| "请求地址不是有效 URL".to_string())?;
+    if !parsed.username().is_empty()
+        || parsed.password().is_some()
+        || parsed.query().is_some()
+        || parsed.fragment().is_some()
+    {
+        return Err("请求地址不能包含凭据、查询参数或片段".into());
+    }
+    let loopback = match parsed.host() {
+        Some(Host::Domain(host)) => host.eq_ignore_ascii_case("localhost"),
+        Some(Host::Ipv4(address)) => address.is_loopback(),
+        Some(Host::Ipv6(address)) => address.is_loopback(),
+        None => false,
+    };
+    if parsed.scheme() != "https" && !(parsed.scheme() == "http" && loopback) {
+        return Err("远程请求地址必须使用 HTTPS；HTTP 仅允许 localhost 或 loopback".into());
+    }
+    Ok(config)
+}
+
+fn provider_config_path(app_data: &Path) -> PathBuf {
+    app_data.join("provider-config.json")
+}
+
+fn read_provider_config(app_data: &Path) -> Result<Option<ProviderConfig>, String> {
+    let path = provider_config_path(app_data);
+    if !path.exists() {
+        return Ok(None);
+    }
+    let raw = fs::read_to_string(path).map_err(|error| error.to_string())?;
+    let config = serde_json::from_str(&raw).map_err(|_| "模型通道配置损坏".to_string())?;
+    validate_provider_config(config).map(Some)
+}
+
+fn write_provider_config(app_data: &Path, config: &ProviderConfig) -> Result<(), String> {
+    fs::create_dir_all(app_data).map_err(|error| error.to_string())?;
+    let path = provider_config_path(app_data);
+    let temporary = app_data.join("provider-config.json.tmp");
+    let payload = serde_json::to_vec_pretty(config).map_err(|error| error.to_string())?;
+    fs::write(&temporary, payload).map_err(|error| error.to_string())?;
+    if path.exists() {
+        fs::remove_file(&path).map_err(|error| error.to_string())?;
+    }
+    fs::rename(temporary, path).map_err(|error| error.to_string())
+}
+
 async fn launch_backend(app: AppHandle) -> Result<(), String> {
     let state = app.state::<BackendState>();
     stop_backend(&state);
@@ -118,6 +233,7 @@ async fn launch_backend(app: AppHandle) -> Result<(), String> {
     copy_directory_if_missing(&resource_dir.join("personal-snapshot"), &personal_dir)?;
     fs::create_dir_all(&personal_dir).map_err(|error| error.to_string())?;
     fs::create_dir_all(&log_dir).map_err(|error| error.to_string())?;
+    let provider = read_provider_config(&app_data)?.unwrap_or_else(default_provider_config);
 
     let token = uuid::Uuid::new_v4().simple().to_string();
     let ready_file = log_dir.join(format!("backend-ready-{token}.json"));
@@ -146,11 +262,24 @@ async fn launch_backend(app: AppHandle) -> Result<(), String> {
             "--root",
             app_data.to_string_lossy().as_ref(),
         ]);
-    if let Some(value) = credential("openrouter") {
-        command = command.env("OPENROUTER_API_KEY", value);
-    }
-    if let Some(value) = credential("openai") {
-        command = command.env("OPENAI_API_KEY", value);
+    command = command
+        .env("OPENROUTER_API_KEY", "")
+        .env("OPENAI_API_KEY", "");
+    if provider.provider == "openrouter" {
+        command = command
+            .env("OPENROUTER_BASE_URL", &provider.base_url)
+            .env("OPENROUTER_MODEL", &provider.model);
+        if let Some(value) = provider_key("openrouter") {
+            command = command.env("OPENROUTER_API_KEY", value);
+        }
+    } else {
+        command = command
+            .env("OPENAI_BASE_URL", &provider.base_url)
+            .env("OPENAI_MODEL", &provider.model)
+            .env("OPENAI_API_FORMAT", &provider.api_format);
+        if let Some(value) = provider_key("openai") {
+            command = command.env("OPENAI_API_KEY", value);
+        }
     }
 
     let (mut receiver, child) = command.spawn().map_err(|error| error.to_string())?;
@@ -313,6 +442,42 @@ async fn restart_backend(app: AppHandle) -> Result<RuntimeInfo, String> {
 }
 
 #[tauri::command]
+fn get_provider_config(app: AppHandle) -> Result<ProviderConfig, String> {
+    let app_data = resolve_app_data_dir(&app)?;
+    Ok(read_provider_config(&app_data)?.unwrap_or_else(default_provider_config))
+}
+
+#[tauri::command]
+async fn save_provider_config(
+    app: AppHandle,
+    provider: String,
+    base_url: String,
+    model: String,
+    api_format: String,
+    secret: Option<String>,
+) -> Result<RuntimeInfo, String> {
+    let config = validate_provider_config(ProviderConfig {
+        provider,
+        base_url,
+        model,
+        api_format,
+    })?;
+    if let Some(value) = secret.filter(|value| !value.trim().is_empty()) {
+        keyring::Entry::new("EAI Desktop", &config.provider)
+            .map_err(|error| error.to_string())?
+            .set_password(value.trim())
+            .map_err(|error| error.to_string())?;
+    }
+    if provider_key(&config.provider).is_none() {
+        return Err("请输入 API Key".into());
+    }
+    let app_data = resolve_app_data_dir(&app)?;
+    write_provider_config(&app_data, &config)?;
+    launch_backend(app.clone()).await?;
+    get_runtime_info(app.state::<BackendState>()).await
+}
+
+#[tauri::command]
 fn open_logs(app: AppHandle) -> Result<(), String> {
     let path = resolve_app_data_dir(&app)?.join("logs");
     std::process::Command::new("explorer")
@@ -357,6 +522,8 @@ fn main() {
             get_runtime_info,
             restart_backend,
             open_logs,
+            get_provider_config,
+            save_provider_config,
             set_provider_secret,
             clear_provider_secret
         ])
@@ -389,7 +556,9 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{copy_directory_if_missing, select_app_data_dir};
+    use super::{
+        copy_directory_if_missing, select_app_data_dir, validate_provider_config, ProviderConfig,
+    };
     use std::fs;
 
     fn test_root(name: &str) -> std::path::PathBuf {
@@ -447,5 +616,20 @@ mod tests {
             "personal"
         );
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn provider_urls_require_https_except_for_loopback() {
+        let config = |base_url: &str| ProviderConfig {
+            provider: "openai".into(),
+            base_url: base_url.into(),
+            model: "test-model".into(),
+            api_format: "chat".into(),
+        };
+        assert!(validate_provider_config(config("http://localhost:8317/v1")).is_ok());
+        assert!(validate_provider_config(config("http://127.0.0.1:8317/v1")).is_ok());
+        assert!(validate_provider_config(config("https://relay.example/v1")).is_ok());
+        assert!(validate_provider_config(config("http://relay.example/v1")).is_err());
+        assert!(validate_provider_config(config("https://user:secret@relay.example/v1")).is_err());
     }
 }

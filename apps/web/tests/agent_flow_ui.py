@@ -95,7 +95,16 @@ with sync_playwright() as playwright:
     page.on("pageerror", lambda error: page_errors.append(str(error)))
     page.goto(BASE_URL, wait_until="networkidle")
 
-    page.locator(".home-surface").wait_for(state="visible")
+    try:
+        page.locator(".home-surface").wait_for(state="visible")
+    except Exception:
+        print(json.dumps({
+            "console_errors": console_errors,
+            "page_errors": page_errors,
+            "body": page.locator("body").inner_text()[:2000],
+        }, ensure_ascii=False), file=sys.stderr)
+        page.screenshot(path=str(RESULTS / "startup-failure.png"), full_page=True)
+        raise
     home_title_size = page.locator(".home-surface h1").evaluate("node => parseFloat(getComputedStyle(node).fontSize)")
     assert home_title_size >= 38, home_title_size
     home_main_box = page.locator(".home-main").bounding_box()

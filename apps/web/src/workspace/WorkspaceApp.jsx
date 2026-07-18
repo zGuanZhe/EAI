@@ -13,11 +13,13 @@ import {
   Copy,
   FileText,
   Folder,
+  FolderPlus,
   GitBranch,
   KeyRound,
   Layers,
   Link2,
   ListChecks,
+  MessageSquarePlus,
   PanelRight,
   Pencil,
   Plus,
@@ -55,7 +57,7 @@ import { AgentApprovalInspector } from "../features/inspector/AgentApprovalInspe
 import { ConfirmDialog, RightRail } from "../features/inspector/RightRail.jsx";
 import { WorkspaceCreateDialog } from "../features/workspace/WorkspaceCreateDialog.jsx";
 import { useWorkspaceServerState } from "../features/workspace/useWorkspaceServerState.js";
-import { InlineNotice } from "../components/ui/index.jsx";
+import { Button, InlineNotice } from "../components/ui/index.jsx";
 import { useNotifications } from "../app/Notifications.jsx";
 import { Sidebar } from "../layout/Sidebar.jsx";
 import { initialWorkspaceState, workspaceReducer } from "../state/workspaceReducer.js";
@@ -1481,10 +1483,32 @@ export function App() {
 
   if (!thread) {
     return (
-      <>
-        <div className="boot">{bootstrapped ? "EAI-Desktop" : "正在加载 EAI vNext..."}</div>
+      <div className="empty-workspace-shell">
+        <header className="empty-workspace-header">
+          <strong>EAI Desktop</strong>
+          <Button compact onClick={openSettings}><KeyRound size={15} />模型设置</Button>
+        </header>
+        <main className="empty-workspace-main">
+          <span className="empty-workspace-icon"><MessageSquarePlus size={22} /></span>
+          <h1>{bootstrapped ? "还没有研究问题" : "正在加载工作区"}</h1>
+          {bootstrapped && <p>可以直接创建一个未归档问题，或先定义成果目标。</p>}
+          {bootstrapped && (
+            <div className="empty-workspace-actions">
+              <Button variant="primary" onClick={() => setCreateDialog({ kind: "thread", required: false })}><MessageSquarePlus size={16} />新建研究问题</Button>
+              <Button onClick={() => setCreateDialog({ kind: "project", required: false })}><FolderPlus size={16} />新建成果目标</Button>
+            </div>
+          )}
+          {status && <span className="empty-workspace-status" role="status">{status}</span>}
+        </main>
         {createDialogElement}
-      </>
+        <DesktopSettings
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          systemInfo={systemInfo}
+          secrets={secrets}
+          onRuntimeRestarted={refreshRuntimeState}
+        />
+      </div>
     );
   }
 

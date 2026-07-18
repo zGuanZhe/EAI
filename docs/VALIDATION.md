@@ -15,16 +15,16 @@ Run Campaign Docker smoke when Campaign/Docker changes, sidecar gates when its d
 ## Current Results
 
 - Repository bootstrap: passed with clean npm dependencies and repository-local Python environment.
-- Frontend Vitest: 23 tests passed, including axe and Atlas query race coverage.
+- Frontend Vitest: 24 tests passed, including axe, Atlas query race coverage, dismissible first-run creation and desktop Provider configuration.
 - Frontend production build: passed.
 - Service unittest: 83 tests passed, including Agent v2.1, SourcePolicy, Evidence Guard, SSE replay, Research Store schema 4/outbox, the 0.4.1 schema-3-ceiling round trip, PDF limits, Campaign, legacy read/410 boundaries, drafts, OperationBatch and ChangeSet undo.
 - Canonical transaction fault coverage passed: multi-record failure rolls back every canonical row and journal entry; expected-payload conflict writes nothing; JSON projection failure preserves the SQLite commit and replayable journal; a runtime receipt failure after commit reconciles without applying OperationBatch twice.
 - Application composition coverage passed: an immutable `ApplicationConfig` creates an isolated application/data root, `application.py` has zero route decorators, and the frozen OpenAPI baseline remains 107 paths, 116 operations with hash `d5ddb8afd8dc8b784f64c52cfaee0b026d661bf5b9d5de5ac21dff667e5d1f3a`.
 - Playwright: passed with the isolated empty seed at `1440x900`, `1180x820`, and `760x900`; narrow main width was 696px.
-- Campaign Docker fixture: last attempt failed while Docker Hub returned an anonymous-token EOF pulling `python:3.11-slim`; no host fallback ran. A green rerun is required before release.
+- Campaign Docker fixture: passed in Docker with the expected fixture metric; no host fallback ran.
 - Sidecar: rebuilt from the new workspace with Python 3.14.4; random-port authentication and Tauri CORS smoke passed.
-- Rust: fmt passed, Clippy passed with `-D warnings`, and 3 tests passed.
-- Historical 0.4.0 NSIS smoke passed. The 0.4.1 safety bridge and final 0.5.0 installer/upgrade/downgrade/uninstall exercises are still required.
+- Rust: fmt passed, Clippy passed with `-D warnings`, and 4 tests passed, including loopback/HTTPS Provider URL validation.
+- Current 0.5.0 NSIS isolated install/start/close/uninstall smoke passed and real AppData remained unchanged. The packaged 0.4.1 safety bridge plus 0.5 upgrade/downgrade recovery exercises are still required.
 
 ## Installed-App Acceptance
 

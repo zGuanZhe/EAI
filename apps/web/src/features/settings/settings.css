@@ -7,5 +7,6 @@
 .settings-group > header .ui-status { margin-left: auto; }
 .settings-group input, .settings-group select { width: 100%; min-height: 36px; border: 0; border-bottom: 1px solid var(--line-strong); outline: 0; background: transparent; color: var(--ink); }
 .settings-group input:focus, .settings-group select:focus { border-bottom-color: var(--violet); }
+.settings-group input:invalid { box-shadow: none; }
 .settings-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
 .runtime-boundaries code { display: block; overflow-wrap: anywhere; color: var(--muted); font-family: ui-monospace, monospace; font-size: 11px; }

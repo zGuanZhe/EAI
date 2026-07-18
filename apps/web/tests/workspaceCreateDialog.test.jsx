@@ -56,6 +56,7 @@ describe("WorkspaceCreateDialog", () => {
         kind="project"
         atlases={atlases}
         defaultAtlasId="G"
+        required
         onCancel={onCancel}
         onCreate={vi.fn()}
       />
@@ -64,6 +65,8 @@ describe("WorkspaceCreateDialog", () => {
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "成果名称" })));
     await user.keyboard("{Escape}");
     expect(onCancel).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "关闭创建窗口" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "取消" })).toBeTruthy();
 
     const results = await axe.run(document.body, { rules: { "color-contrast": { enabled: false } } });
     expect(results.violations.filter((item) => ["serious", "critical"].includes(item.impact))).toEqual([]);

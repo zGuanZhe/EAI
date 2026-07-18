@@ -23,6 +23,8 @@ The active workspace is `D:\Test\GUAN\EAI`. The former `EAI-Desktop` repository 
 - Agent v2 fixed-specialist and Lab-write branches were removed.
 - Architecture checks prevent old workspace paths, hot-path regressions, and version drift.
 - Desktop AppData can be overridden only in explicit test mode, enabling isolated install smoke without touching real user data.
+- Desktop settings persist the selected Provider, Base URL, model and API format as non-secret AppData configuration while API keys remain in Windows Credential Manager. Only the selected Provider is injected into the sidecar; remote endpoints require HTTPS and loopback endpoints may use HTTP.
+- First-run workspace creation is dismissible by close, Cancel, backdrop and Escape. An empty workspace remains usable and exposes model settings plus direct project/thread creation instead of trapping the user in a required modal.
 - Workspace server state now uses React Query keys; thread detail remains local because SSE patches it incrementally. Atlas switching, knowledge polling and runtime refresh no longer use request counters or ad hoc timers.
 - Workspace, Draft, System, Atlas/Object Memory and Agent v2/source/document APIs use explicit router/service boundaries. Agent API orchestration and its shared thread lock are lifespan-owned. Architecture checks validate dependency direction and registered routers rather than treating file size as the primary metric.
 - Change review, thread content, Task Pack and legacy read/replay APIs now use explicit router/service boundaries. Legacy Agent v1 mutations terminate at the frozen `410 Gone` router; their unreachable execution, Provider loop and Lab/Task Pack construction code has been removed.
@@ -38,11 +40,13 @@ Completed in the new workspace:
 
 - clean `npm ci` and repository-local Python bootstrap
 - UTF-8/architecture checks
-- frontend Vitest and production build
+- 24-test frontend Vitest suite and production build
 - 83-test FastAPI suite, including Agent v2, Research Store, Campaign, synthetic legacy fixtures, canonical batch rollback, projection failure, runtime receipt reconciliation and `410` compatibility
 - isolated Playwright coverage at desktop, medium and narrow widths
-- previously green Campaign Docker fixture and freshly built PyInstaller sidecar smoke; the latest Docker rerun is blocked as noted below
-- Rust fmt, Clippy with warnings denied, and three desktop data-path tests
+- Campaign Docker fixture, with execution isolated in Docker and no host fallback
+- freshly built PyInstaller sidecar smoke on a random port
+- Rust fmt, Clippy with warnings denied, and four desktop data-path/provider-config tests
+- current 0.5.0 NSIS isolated install/start/close/uninstall smoke
 - historical NSIS 0.4.0 isolated install/start/close/uninstall smoke
 - real `%APPDATA%\com.eai.desktop` SHA-256 tree unchanged before and after installed-app smoke
 
@@ -54,11 +58,10 @@ The historical installer metadata and current 0.5 release gaps are recorded in `
 - Full Campaign execution requires Docker. Without Docker, ideation, plans and command previews remain available but execution is disabled.
 - The NSIS package is unsigned and has no automatic updater.
 - AI Scientist v2 is pinned at `96bd51617cfdbb494a9fc283af00fe090edfae48`; preserve its LICENSE and EAI derivation notice.
-- Campaign Docker smoke is currently blocked by an anonymous Docker Hub token EOF while pulling `python:3.11-slim`. This is an external failure, not a Docker-unavailable skip, and no host fallback occurred.
 - A Web E2E run once timed out waiting for an Agent resumed stream and passed on immediate isolated rerun. Treat recurrence as an SSE/terminal-state race, not as an ignorable failure.
 
 ## Next Priorities
 
 1. Run the schema 3 -> 4 backup/restore report and the packaged 0.4.1 schema 4 read-only downgrade/reopen exercise.
 2. Begin the next major upgrade from `ApplicationAssembly` and the domain service boundaries without moving domain behavior back into `application.py`.
-3. Complete sidecar, Rust, PyInstaller and NSIS release gates, then run the restricted 20-query real Provider citation audit.
+3. Complete packaged 0.4.1 downgrade and 0.5 upgrade/downgrade recovery exercises, then run the restricted 20-query real Provider citation audit.
