@@ -5,6 +5,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
 from ..core.storage import read_json_file
@@ -21,6 +22,7 @@ from ..schemas.models import (
     AtlasUpdateTaskPackResponse,
     CardType,
     ObjectMemory,
+    PaperChatRequest,
 )
 from .projection import ProjectionService
 
@@ -42,12 +44,14 @@ class AtlasService:
         personal_dir: Path,
         objects_dir: Path,
         atlas_updates_dir: Path,
+        paper_model: Callable[[str, str | None], tuple[str, str]] | None = None,
     ) -> None:
         self.store = store
         self.atlas_cache_dir = atlas_cache_dir.resolve()
         self.personal_dir = personal_dir.resolve()
         self.objects_dir = objects_dir.resolve()
         self.atlas_updates_dir = atlas_updates_dir.resolve()
+        self.paper_model = paper_model
 
     @staticmethod
     def _now() -> str:
@@ -226,6 +230,92 @@ class AtlasService:
             path,
         )
         return memory
+
+    @staticmethod
+    def _paper_chat_prompt(memory: ObjectMemory, payload: PaperChatRequest) -> str:
+        context = payload.paper_context or {}
+        compact_context = json.dumps(context, ensure_ascii=False, indent=2)[:12000]
+        compact_memory = json.dumps({
+            "judgement": memory.judgement,
+            "note": memory.note,
+            "tags": memory.tags,
+            "maturity": memory.maturity,
+            "core_innovation": memory.core_innovation,
+            "core_technology": memory.core_technology,
+            "evidence": memory.evidence,
+            "limitations": memory.limitations,
+            "reusable_insight": memory.reusable_insight,
+            "reading_questions": memory.reading_questions,
+        }, ensure_ascii=False, indent=2)
+        return "\n".join([
+            "# 论文页内对话", "",
+            "你是我的中文学术研究助手。只基于下面给出的论文对象、Atlas 路线、关系邻域和个人记录回答；信息不足时明确写“需要读原文确认”，不要编造实验细节。", "",
+            "## 当前论文上下文", compact_context, "", "## 已有对象记忆", compact_memory, "",
+            "## 用户问题", payload.message.strip(), "", "## 输出要求",
+            "先用自然语言回答用户问题。若你能提炼结构化阅读信息，请附带 fenced JSON 块，格式为：",
+            "```eai-paper-reading/v1",
+            json.dumps({
+                "core_innovation": "一到三句核心创新",
+                "core_technology": "核心技术、方法机制或系统流程",
+                "evidence": "证据与实验支撑；未知则标注需要读原文确认",
+                "limitations": "局限、边界或未解决问题",
+                "reusable_insight": "对当前成果目标可复用的启发",
+                "reading_questions": ["下一步需要查证的问题"],
+            }, ensure_ascii=False, indent=2),
+            "```",
+        ])
+
+    @staticmethod
+    def _paper_reading_payload(raw_text: str) -> dict[str, Any] | None:
+        candidates = re.findall(r"```(?:json|eai-paper-reading/v1)?\s*([\s\S]*?)```", raw_text)
+        stripped = raw_text.strip()
+        if stripped.startswith("{") and stripped.endswith("}"):
+            candidates.append(stripped)
+        for candidate in candidates:
+            try:
+                parsed = json.loads(candidate)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(parsed, dict):
+                return parsed
+        return None
+
+    @staticmethod
+    def _apply_paper_reading(memory: ObjectMemory, parsed: dict[str, Any] | None) -> None:
+        if not parsed:
+            return
+        for field in ("core_innovation", "core_technology", "evidence", "limitations", "reusable_insight"):
+            value = parsed.get(field)
+            if isinstance(value, str) and value.strip():
+                setattr(memory, field, value.strip())
+        questions = parsed.get("reading_questions")
+        if isinstance(questions, list):
+            memory.reading_questions = [str(item).strip() for item in questions if str(item).strip()]
+
+    def chat_with_paper(self, atlas_id: str, paper_id: str, payload: PaperChatRequest) -> ObjectMemory:
+        message = payload.message.strip()
+        if not message:
+            raise ValueError("消息不能为空。")
+        if self.paper_model is None:
+            raise RuntimeError("paper model capability is not configured")
+        self._object_path(atlas_id, "paper", paper_id)
+        memory = self.effective_object_memory(atlas_id, "paper", paper_id) or ObjectMemory(
+            object_ref={"atlas_id": atlas_id, "object_type": "paper", "object_id": paper_id},
+            title_snapshot=str((payload.paper_context or {}).get("title") or ""),
+        )
+        raw_text, used_model = self.paper_model(self._paper_chat_prompt(memory, payload), payload.model)
+        memory.paper_chat = [
+            *memory.paper_chat,
+            {"id": self._slug("paper_chat"), "role": "user", "content": message, "created_at": self._now()},
+            {
+                "id": self._slug("paper_chat"), "role": "assistant", "content": raw_text,
+                "created_at": self._now(), "model": used_model,
+            },
+        ]
+        if not memory.title_snapshot:
+            memory.title_snapshot = str((payload.paper_context or {}).get("title") or paper_id)
+        self._apply_paper_reading(memory, self._paper_reading_payload(raw_text))
+        return self.write_object_memory(atlas_id, "paper", paper_id, memory)
 
     def load_updates(self, atlas_id: str) -> AtlasUpdateDoc:
         stored = self.store.get_record("atlas_update", atlas_id)

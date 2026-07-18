@@ -5,7 +5,7 @@ from typing import Callable
 
 from fastapi import APIRouter
 
-from ..services.system import build_system_info, current_runtime_mode
+from ..services.system import build_secret_status, build_system_info, current_runtime_mode
 
 
 def create_system_router(
@@ -17,9 +17,9 @@ def create_system_router(
     secret_candidates: list[Path | None],
     research_status: Callable[[], dict[str, object]] | None = None,
 ) -> APIRouter:
-    router = APIRouter(prefix="/api/vnext", tags=["system"])
+    router = APIRouter(prefix="/api/vnext")
 
-    @router.get("/health")
+    @router.get("/health", tags=["system"])
     def health() -> dict[str, object]:
         return {
             "ok": True,
@@ -27,7 +27,7 @@ def create_system_router(
             "runtime_mode": current_runtime_mode(),
         }
 
-    @router.get("/system/info")
+    @router.get("/system/info", tags=["system"])
     def system_info() -> dict[str, object]:
         return build_system_info(
             service_version=service_version,
@@ -37,5 +37,9 @@ def create_system_router(
             secret_candidates=secret_candidates,
             research_status=research_status,
         )
+
+    @router.get("/secrets/status")
+    def secrets_status() -> dict[str, object]:
+        return build_secret_status(secret_candidates)
 
     return router

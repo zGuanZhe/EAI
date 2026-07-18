@@ -12,6 +12,13 @@ def current_runtime_mode() -> str:
     return "desktop" if os.environ.get("EAI_DESKTOP_MODE") == "1" else "browser"
 
 
+def build_secret_status(secret_candidates: list[Path | None]) -> dict[str, object]:
+    data, path = read_secret_data(secret_candidates)
+    if path and data is None:
+        return {"configured": False, "providers": [], "source": "user_config", "error": "invalid JSON"}
+    return safe_secret_status(data, path, bool(os.environ.get("OPENAI_API_KEY")))
+
+
 def build_system_info(
     *,
     service_version: str,
@@ -21,7 +28,6 @@ def build_system_info(
     secret_candidates: list[Path | None],
     research_status: Callable[[], dict[str, object]] | None = None,
 ) -> dict[str, object]:
-    data, path = read_secret_data(secret_candidates)
     runtime_mode = current_runtime_mode()
     return {
         "service_version": service_version,
@@ -31,6 +37,6 @@ def build_system_info(
         "atlas_cache_dir": public_path(atlas_cache_dir),
         "log_dir": public_path(Path(os.environ.get("EAI_DESKTOP_LOG_DIR", personal_dir / "logs"))),
         "active_backend_id": f"{root.name}:{service_version}",
-        "secrets_status": safe_secret_status(data, path, bool(os.environ.get("OPENAI_API_KEY"))),
+        "secrets_status": build_secret_status(secret_candidates),
         "research_store": research_status() if research_status else None,
     }

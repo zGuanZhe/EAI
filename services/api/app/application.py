@@ -46,7 +46,7 @@ from .campaign.router import create_campaign_router
 from .campaign.models import BranchCompareRequest
 from .campaign.service import CampaignService
 from .core.paths import resolve_runtime_paths
-from .core.secrets import read_secret_data, safe_secret_status, secret_candidates
+from .core.secrets import read_secret_data, secret_candidates
 from .core.storage import atomic_write_json_file, backup_file, read_json_file
 from .factory import create_app
 from .routers.system import create_system_router
@@ -145,6 +145,7 @@ def get_atlas_service() -> AtlasService:
         personal_dir=PERSONAL_DIR,
         objects_dir=OBJECTS_DIR,
         atlas_updates_dir=ATLAS_UPDATES_DIR,
+        paper_model=call_openai_task_pack,
     )
 
 
@@ -220,7 +221,6 @@ from .schemas.models import (
     ProjectCreate,
     ProjectUpdate,
     ObjectMemory,
-    PaperChatRequest,
     ResultCard,
     Message,
     ToolRun,
@@ -407,41 +407,6 @@ def safe_id_or_slug(value: Any, prefix: str) -> str:
     if text and re.fullmatch(r"[A-Za-z0-9_.:-]+", text):
         return text
     return slug_id(prefix)
-
-
-@app.post("/api/vnext/object-memory/{atlas_id}/paper/{paper_id}/chat", response_model=ObjectMemory)
-def chat_with_paper(atlas_id: str, paper_id: str, payload: PaperChatRequest) -> ObjectMemory:
-    message = payload.message.strip()
-    if not message:
-        raise HTTPException(status_code=400, detail="消息不能为空。")
-    safe_object_path(atlas_id, "paper", paper_id)
-    memory = effective_object_memory(atlas_id, "paper", paper_id) or ObjectMemory(
-        object_ref={"atlas_id": atlas_id, "object_type": "paper", "object_id": paper_id},
-        title_snapshot=str((payload.paper_context or {}).get("title") or ""),
-    )
-    prompt = build_paper_chat_prompt(memory, payload)
-    raw_text, used_model = call_openai_task_pack(prompt, payload.model)
-    now = utc_now()
-    memory.paper_chat = [
-        *memory.paper_chat,
-        {
-            "id": slug_id("paper_chat"),
-            "role": "user",
-            "content": message,
-            "created_at": now,
-        },
-        {
-            "id": slug_id("paper_chat"),
-            "role": "assistant",
-            "content": raw_text,
-            "created_at": utc_now(),
-            "model": used_model,
-        },
-    ]
-    if not memory.title_snapshot:
-        memory.title_snapshot = str((payload.paper_context or {}).get("title") or paper_id)
-    apply_paper_reading_payload(memory, parse_paper_reading_payload(raw_text))
-    return write_object_memory(atlas_id, "paper", paper_id, memory)
 
 
 def safe_run_text(value: Any, limit: int = 240) -> str:
@@ -3864,88 +3829,6 @@ def parse_result_payload(raw_text: str) -> dict[str, Any] | None:
     return None
 
 
-def parse_paper_reading_payload(raw_text: str) -> dict[str, Any] | None:
-    matches = re.findall(r"```(?:json|eai-paper-reading/v1)?\s*([\s\S]*?)```", raw_text)
-    candidates = matches[:]
-    stripped = raw_text.strip()
-    if stripped.startswith("{") and stripped.endswith("}"):
-        candidates.append(stripped)
-    for candidate in candidates:
-        try:
-            parsed = json.loads(candidate)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(parsed, dict):
-            return parsed
-    return None
-
-
-def build_paper_chat_prompt(memory: ObjectMemory, payload: PaperChatRequest) -> str:
-    context = payload.paper_context or {}
-    compact_context = json.dumps(context, ensure_ascii=False, indent=2)[:12000]
-    compact_memory = json.dumps(
-        {
-            "judgement": memory.judgement,
-            "note": memory.note,
-            "tags": memory.tags,
-            "maturity": memory.maturity,
-            "core_innovation": memory.core_innovation,
-            "core_technology": memory.core_technology,
-            "evidence": memory.evidence,
-            "limitations": memory.limitations,
-            "reusable_insight": memory.reusable_insight,
-            "reading_questions": memory.reading_questions,
-        },
-        ensure_ascii=False,
-        indent=2,
-    )
-    return "\n".join(
-        [
-            "# 论文页内对话",
-            "",
-            "你是我的中文学术研究助手。只基于下面给出的论文对象、Atlas 路线、关系邻域和个人记录回答；信息不足时明确写“需要读原文确认”，不要编造实验细节。",
-            "",
-            "## 当前论文上下文",
-            compact_context,
-            "",
-            "## 已有对象记忆",
-            compact_memory,
-            "",
-            "## 用户问题",
-            payload.message.strip(),
-            "",
-            "## 输出要求",
-            "先用自然语言回答用户问题。若你能提炼结构化阅读信息，请附带 fenced JSON 块，格式为：",
-            "```eai-paper-reading/v1",
-            json.dumps(
-                {
-                    "core_innovation": "一到三句核心创新",
-                    "core_technology": "核心技术、方法机制或系统流程",
-                    "evidence": "证据与实验支撑；未知则标注需要读原文确认",
-                    "limitations": "局限、边界或未解决问题",
-                    "reusable_insight": "对当前成果目标可复用的启发",
-                    "reading_questions": ["下一步需要查证的问题"],
-                },
-                ensure_ascii=False,
-                indent=2,
-            ),
-            "```",
-        ]
-    )
-
-
-def apply_paper_reading_payload(memory: ObjectMemory, parsed: dict[str, Any] | None) -> None:
-    if not parsed:
-        return
-    for field in ["core_innovation", "core_technology", "evidence", "limitations", "reusable_insight"]:
-        value = parsed.get(field)
-        if isinstance(value, str) and value.strip():
-            setattr(memory, field, value.strip())
-    questions = parsed.get("reading_questions")
-    if isinstance(questions, list):
-        memory.reading_questions = [str(item).strip() for item in questions if str(item).strip()]
-
-
 def text_from_item(item: Any) -> tuple[str, str]:
     if isinstance(item, dict):
         title = str(item.get("title") or item.get("summary") or item.get("task") or item.get("content") or "未命名")
@@ -4969,14 +4852,6 @@ def get_agent_api_service() -> AgentApiService:
             thread_lock=APP_SERVICES.agent_thread_lock,
         ),
     )
-
-
-@app.get("/api/vnext/secrets/status")
-def secrets_status() -> dict[str, Any]:
-    data, path = load_secret_data()
-    if path and data is None:
-        return {"configured": False, "providers": [], "source": "user_config", "error": "invalid JSON"}
-    return safe_secret_status(data, path, bool(os.environ.get("OPENAI_API_KEY")))
 
 
 app.include_router(create_research_router(get_research_store, get_knowledge_enrichment, get_page_preview_service))

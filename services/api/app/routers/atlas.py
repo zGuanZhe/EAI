@@ -14,6 +14,7 @@ from ..schemas.models import (
     AtlasUpdateTaskPackResponse,
     CardType,
     ObjectMemory,
+    PaperChatRequest,
 )
 from ..services.atlas import AtlasCandidateNotFoundError, AtlasResourceNotFoundError, AtlasService
 
@@ -49,6 +50,10 @@ def create_atlas_router(get_service: Callable[[], AtlasService]) -> APIRouter:
     @router.put("/object-memory/{atlas_id}/{object_type}/{object_id}", response_model=ObjectMemory)
     def update_object_memory(atlas_id: str, object_type: CardType, object_id: str, payload: ObjectMemory) -> ObjectMemory:
         return call(lambda: service().write_object_memory(atlas_id, object_type, object_id, payload))
+
+    @router.post("/object-memory/{atlas_id}/paper/{paper_id}/chat", response_model=ObjectMemory)
+    def chat_with_paper(atlas_id: str, paper_id: str, payload: PaperChatRequest) -> ObjectMemory:
+        return call(lambda: service().chat_with_paper(atlas_id, paper_id, payload))
 
     @router.get("/atlas-updates/{atlas_id}", response_model=AtlasUpdateDoc)
     def get_atlas_updates(atlas_id: str) -> AtlasUpdateDoc:
