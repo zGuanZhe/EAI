@@ -211,6 +211,8 @@ with sync_playwright() as playwright:
     page.locator(".timeline-paper").first.dblclick()
     reader = page.locator(".paper-reader")
     reader.wait_for(state="visible")
+    assert page.locator("#root").evaluate("node => node.inert") is True
+    assert reader.evaluate("node => node.contains(document.activeElement)") is True
     assert page.locator(".right-rail").count() == 0
     assert reader.locator("textarea").count() == 0
     assert reader.locator(".paper-pending-fields").count() == 1
@@ -220,7 +222,19 @@ with sync_playwright() as playwright:
     reader.locator(".paper-claim").first.locator("summary").click()
     assert reader.locator(".paper-claim blockquote").count() >= 1
     page.screenshot(path=str(RESULTS / "paper-reader-desktop.png"))
+    reader.locator(".paper-pending-fields > div button").first.click()
+    reader.locator(".paper-reading-editor textarea").fill("需要进一步核验的临时判断")
     reader.locator(".paper-reader-back").click()
+    close_confirmation = page.locator(".paper-reader-close-confirm")
+    close_confirmation.wait_for(state="visible")
+    assert reader.evaluate("node => node.inert") is True
+    page.screenshot(path=str(RESULTS / "paper-reader-unsaved-confirm.png"))
+    close_confirmation.get_by_role("button", name="继续编辑").click()
+    assert reader.evaluate("node => node.inert") is False
+    reader.locator(".paper-reading-editor").get_by_role("button", name="取消").click()
+    reader.locator(".paper-reader-back").click()
+    reader.wait_for(state="detached")
+    assert page.locator("#root").evaluate("node => node.inert") is False
 
     paper = page.locator(".timeline-paper").first
     paper.click()

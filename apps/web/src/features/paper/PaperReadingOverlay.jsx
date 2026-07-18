@@ -1,5 +1,8 @@
 import { ArrowLeft, BookOpenCheck, Check, ExternalLink, FileSearch, LoaderCircle, MessageSquareText, Pencil, Pin, Quote, ShieldCheck, Sparkles, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+
+const FOCUSABLE = "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])";
 
 const READING_FIELDS = [
   ["judgement", "个人判断"],
@@ -29,6 +32,15 @@ export function PaperReadingOverlay({
   const [savedDraft, setSavedDraft] = useState(() => initialDraft(detail?.memory));
   const [editing, setEditing] = useState("");
   const [saving, setSaving] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(false);
+  const readerRef = useRef(null);
+  const closeButtonRef = useRef(null);
+  const closeConfirmRef = useRef(null);
+  const continueEditingRef = useRef(null);
+  const previousFocusRef = useRef(null);
+  const dirtyRef = useRef(false);
+  const confirmCloseRef = useRef(false);
+  const onCloseRef = useRef(onClose);
   const paper = detail?.value;
   const memory = detail?.memory || {};
   const relations = detail?.relations || [];
@@ -39,9 +51,15 @@ export function PaperReadingOverlay({
   );
   const routeName = detail?.route?.title_cn || detail?.route?.title || detail?.route?.label || paper?.route_id || "未定路线";
   const dirty = JSON.stringify(draft) !== JSON.stringify(savedDraft);
+  dirtyRef.current = dirty;
+  confirmCloseRef.current = confirmClose;
+  onCloseRef.current = onClose;
   const closeReader = () => {
-    if (dirty && !window.confirm("当前论文笔记尚未保存，确认关闭吗？")) return;
-    onClose?.();
+    if (dirtyRef.current) {
+      setConfirmClose(true);
+      return;
+    }
+    onCloseRef.current?.();
   };
 
   useEffect(() => {
@@ -49,14 +67,54 @@ export function PaperReadingOverlay({
     setDraft(next);
     setSavedDraft(next);
     setEditing("");
+    setConfirmClose(false);
   }, [detail?.value?.id, detail?.memory?.updated_at]);
 
   useEffect(() => {
     if (!detail) return undefined;
-    const onKey = (event) => event.key === "Escape" && closeReader();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [detail, dirty, onClose]);
+    previousFocusRef.current = document.activeElement;
+    const appRoot = document.getElementById("root");
+    if (appRoot) appRoot.inert = true;
+    const onKey = (event) => {
+      if (event.key === "Escape") {
+        if (confirmCloseRef.current) setConfirmClose(false);
+        else closeReader();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const scope = confirmCloseRef.current ? closeConfirmRef.current : readerRef.current;
+      if (!scope) return;
+      const focusable = [...scope.querySelectorAll(FOCUSABLE)];
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    const frame = requestAnimationFrame(() => closeButtonRef.current?.focus());
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", onKey);
+      if (appRoot) appRoot.inert = false;
+      previousFocusRef.current?.focus?.();
+    };
+  }, [detail?.value?.id]);
+
+  useEffect(() => {
+    if (!confirmClose) return undefined;
+    if (readerRef.current) readerRef.current.inert = true;
+    const frame = requestAnimationFrame(() => continueEditingRef.current?.focus());
+    return () => {
+      cancelAnimationFrame(frame);
+      if (readerRef.current) readerRef.current.inert = false;
+    };
+  }, [confirmClose]);
 
   const memoryPayload = useMemo(() => ({
     object_ref: { atlas_id: detail?.atlas?.id, object_type: "paper", object_id: paper?.id },
@@ -92,11 +150,11 @@ export function PaperReadingOverlay({
 
   const askPrompt = `请围绕《${paper.title}》整理核心创新、核心技术、关键证据、局限与可复用启发。对缺少原文支撑的内容明确标注“需要原文确认”，并将建议修改生成可确认变更集。`;
 
-  return (
-    <div className="paper-reader-layer" role="dialog" aria-modal="true" aria-labelledby="paper-reader-title">
-      <article className="paper-reader" style={{ "--route": detail.routeColor || "#2563eb" }}>
+  return createPortal(
+    <div className="paper-reader-layer">
+      <article ref={readerRef} className="paper-reader" style={{ "--route": detail.routeColor || "#2563eb" }} role="dialog" aria-modal="true" aria-labelledby="paper-reader-title" tabIndex={-1}>
         <header className="paper-reader-header">
-          <button type="button" className="paper-reader-back" onClick={closeReader}><ArrowLeft size={16} />收起</button>
+          <button ref={closeButtonRef} type="button" className="paper-reader-back" onClick={closeReader}><ArrowLeft size={16} />收起</button>
           <div>
             <span>Atlas {detail.atlas?.id || "-"} · {routeName}</span>
             <h1 id="paper-reader-title">{paper.title}</h1>
@@ -190,7 +248,20 @@ export function PaperReadingOverlay({
           </aside>
         </div>
       </article>
-    </div>
+      {confirmClose && (
+        <div className="paper-reader-confirm-layer">
+          <section ref={closeConfirmRef} className="paper-reader-close-confirm" role="alertdialog" aria-modal="true" aria-labelledby="paper-reader-close-title">
+            <h2 id="paper-reader-close-title">笔记尚未保存</h2>
+            <p>关闭阅读器会放弃本次未保存修改。</p>
+            <div>
+              <button ref={continueEditingRef} type="button" onClick={() => setConfirmClose(false)}>继续编辑</button>
+              <button type="button" onClick={() => { setConfirmClose(false); onCloseRef.current?.(); }}>放弃修改并关闭</button>
+            </div>
+          </section>
+        </div>
+      )}
+    </div>,
+    document.body
   );
 }
 

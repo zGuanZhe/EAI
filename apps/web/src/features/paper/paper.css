@@ -12,6 +12,32 @@
   color: #30363d;
 }
 
+.paper-reader-confirm-layer {
+  position: fixed;
+  z-index: 2;
+  inset: 0 0 0 var(--left-width);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(25, 31, 39, 0.28);
+}
+
+.paper-reader-close-confirm {
+  display: grid;
+  width: min(400px, 100%);
+  gap: 10px;
+  border-radius: 8px;
+  padding: 20px;
+  background: #fff;
+  box-shadow: 0 4px 8px rgba(22, 24, 26, 0.18);
+}
+
+.paper-reader-close-confirm h2 { margin: 0; font-size: 17px; letter-spacing: 0; }
+.paper-reader-close-confirm p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.paper-reader-close-confirm > div { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.paper-reader-close-confirm button { min-height: 34px; border: 0; border-radius: 8px; padding: 0 11px; background: var(--panel-soft); cursor: pointer; }
+.paper-reader-close-confirm button:last-child { background: var(--red); color: #fff; }
+
 .paper-reader-header {
   position: sticky;
   top: 0;
@@ -159,7 +185,7 @@
 .paper-claim summary > em { color: var(--muted); font-size: 10px; font-style: normal; white-space: nowrap; }
 .paper-claim > div { display: grid; gap: 8px; padding: 0 0 14px 122px; }
 .paper-claim > div > p { margin: 0; color: var(--orange); font-size: 11px; }
-.paper-claim blockquote { margin: 0; padding: 10px 12px; border: 0; border-left: 3px solid var(--green-line); border-radius: 0 var(--radius-compact) var(--radius-compact) 0; background: var(--green-soft); }
+.paper-claim blockquote { margin: 0; padding: 10px 12px; border: 1px solid var(--green-line); border-radius: var(--radius-compact); background: var(--green-soft); }
 .paper-claim blockquote p { margin: 0; color: #38443f; font-size: 12px; line-height: 1.65; }
 .paper-claim blockquote footer { display: flex; gap: 8px; margin-top: 7px; color: var(--muted); font-size: 10px; }
 .paper-claim blockquote footer span { color: var(--green); }
@@ -435,6 +461,12 @@
 @media (max-width: 760px) {
   .paper-reader-layer {
     left: var(--left-width);
+  }
+
+  .paper-reader-confirm-layer {
+    left: var(--left-width);
+    align-items: end;
+    padding: 12px;
   }
 
   .paper-reader-header {
