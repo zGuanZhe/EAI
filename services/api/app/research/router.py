@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import json
-import time
-from collections.abc import Callable, Iterator
+from collections.abc import AsyncIterator, Callable
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import Response, StreamingResponse
@@ -121,7 +121,7 @@ def create_research_router(
         if not get_store().get_sync_job(job_id):
             raise HTTPException(status_code=404, detail="knowledge sync job not found")
 
-        def stream() -> Iterator[str]:
+        async def stream() -> AsyncIterator[str]:
             seq = after_seq
             while True:
                 events = get_store().sync_events(job_id, seq)
@@ -133,7 +133,7 @@ def create_research_router(
                     break
                 if not events:
                     yield ": heartbeat\n\n"
-                time.sleep(0.25)
+                await asyncio.sleep(0.25)
 
         return StreamingResponse(stream(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 

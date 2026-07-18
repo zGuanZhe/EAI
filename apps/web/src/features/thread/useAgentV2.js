@@ -41,6 +41,7 @@ export function useAgentV2({ thread, surface, setThread, refreshThreads, setSurf
   const [tasksById, setTasksById] = useState({});
   const [chatError, setChatError] = useState("");
   const controllersRef = useRef(new Map());
+  const cancelledTaskIdsRef = useRef(new Set());
   const threadRef = useRef(thread);
   threadRef.current = thread;
 
@@ -216,17 +217,38 @@ export function useAgentV2({ thread, surface, setThread, refreshThreads, setSurf
       .filter((task) => task.thread_id === thread?.id && RUNNING_STATUSES.has(task.status))
       .sort((left, right) => String(right.created_at || "").localeCompare(String(left.created_at || "")))[0];
     if (!active?.id) return;
+    cancelledTaskIdsRef.current.add(active.id);
+    controllersRef.current.get(active.id)?.abort();
+    untrackTask(active.id);
+    patchCurrentThread(thread.id, (current) => ({
+      ...current,
+      messages: (current.messages || []).map((message) => message.refs?.agent_v2_task_id === active.id ? {
+        ...message,
+        content: "已停止本轮任务。",
+        status: "done",
+        refs: { ...(message.refs || {}), cancelled: true }
+      } : message)
+    }));
+    setStatus("已停止本轮任务");
     try {
       await api(`/agent-v2/tasks/${active.id}/cancel`, { method: "POST", body: JSON.stringify({}) });
-      controllersRef.current.get(active.id)?.abort();
-      untrackTask(active.id);
-      setStatus("已停止本轮任务");
       const latest = await api(`/threads/${thread.id}`);
       patchCurrentThread(thread.id, () => latest);
     } catch (error) {
+      cancelledTaskIdsRef.current.delete(active.id);
       setChatError(error.message || "停止任务失败");
+      try {
+        const [{ task }, latest] = await Promise.all([
+          api(`/agent-v2/tasks/${active.id}`),
+          api(`/threads/${thread.id}`)
+        ]);
+        patchCurrentThread(thread.id, () => latest);
+        if (RUNNING_STATUSES.has(task.status)) trackTask(task);
+      } catch {
+        // The visible error remains authoritative when reconciliation also fails.
+      }
     }
-  }, [patchCurrentThread, setStatus, tasksById, thread?.id, untrackTask]);
+  }, [patchCurrentThread, setStatus, tasksById, thread?.id, trackTask, untrackTask]);
 
   const steerThreadChat = useCallback(async (text) => {
     const active = Object.values(tasksById)
@@ -313,7 +335,7 @@ export function useAgentV2({ thread, surface, setThread, refreshThreads, setSurf
     const pending = [...(thread?.messages || [])].reverse().find((message) =>
       message.kind === "assistant_reply" && ["pending", "streaming"].includes(message.status) && message.refs?.agent_v2_task_id
     );
-    if (!pending || tasksById[pending.refs.agent_v2_task_id]) return;
+    if (!pending || tasksById[pending.refs.agent_v2_task_id] || cancelledTaskIdsRef.current.has(pending.refs.agent_v2_task_id)) return;
     let cancelled = false;
     api(`/agent-v2/tasks/${pending.refs.agent_v2_task_id}`).then(({ task }) => {
       if (cancelled || !RESTORABLE_STATUSES.has(task.status)) return;

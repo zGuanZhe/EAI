@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import re
@@ -7,7 +8,7 @@ import sqlite3
 import threading
 import time
 import uuid
-from collections.abc import Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -478,7 +479,7 @@ class AgentRuntimeV2:
         task = self.resume(approval.task_id, resolution)
         return approval, task
 
-    def event_stream(self, task_id: str, after_seq: int = 0, heartbeat_seconds: float = 5) -> Iterator[str]:
+    async def event_stream(self, task_id: str, after_seq: int = 0, heartbeat_seconds: float = 5) -> AsyncIterator[str]:
         self._task(task_id)
         seq = after_seq
         last_heartbeat = time.monotonic()
@@ -493,7 +494,7 @@ class AgentRuntimeV2:
             if time.monotonic() - last_heartbeat >= heartbeat_seconds:
                 last_heartbeat = time.monotonic()
                 yield ": heartbeat\n\n"
-            time.sleep(0.08)
+            await asyncio.sleep(0.08)
 
     def _intake(self, state: RuntimeState) -> RuntimeState:
         task = self._ensure_active(state["task_id"])

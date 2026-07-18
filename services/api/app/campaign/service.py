@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import hashlib
 import os
@@ -10,7 +11,8 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Iterator
+from collections.abc import AsyncIterator
+from typing import Any, Callable
 
 from ..agent_v2.models import ApprovalRequest, ApprovalResolveRequest, Operation, OperationBatch
 from ..agent_v2.sandbox import SandboxUnavailable, docker_available, docker_gpu_available, run_docker_command, stop_docker_container
@@ -892,7 +894,7 @@ class CampaignService:
             raise FileNotFoundError("Artifact file not found")
         return path
 
-    def event_stream(self, campaign_id: str, after_seq: int) -> Iterator[str]:
+    async def event_stream(self, campaign_id: str, after_seq: int) -> AsyncIterator[str]:
         cursor = max(0, after_seq)
         idle = 0
         while idle < 300:
@@ -911,7 +913,7 @@ class CampaignService:
                     break
                 if idle % 15 == 0:
                     yield ": keep-alive\n\n"
-                time.sleep(0.2)
+                await asyncio.sleep(0.2)
 
     def _required(self, campaign_id: str) -> CampaignSnapshot:
         snapshot = self.get(campaign_id)
