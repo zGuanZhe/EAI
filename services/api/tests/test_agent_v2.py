@@ -26,6 +26,7 @@ from app.agent_v2.routing import fallback_service_decision, route_turn
 from app.agent_v2.sandbox import SandboxUnavailable, docker_arguments, run_docker_command
 from app.agent_v2.sources import SourceService
 from app.agent_v2.store import RuntimeStore
+from app.services import agent_domain
 from tests.routing_eval_cases import ROUTING_EVAL_CASES
 
 
@@ -758,7 +759,7 @@ class AgentRuntimeV2Test(unittest.TestCase):
             canonical_key="openalex:W1", content_hash="external", retrieved_at=main.utc_now(),
             provider="openalex", access="open",
         )
-        with patch.object(main, "search_for_agent") as local_search, patch.object(
+        with patch.object(agent_domain, "search_for_agent") as local_search, patch.object(
             runtime.sources, "search", return_value=([external], [])
         ) as external_search:
             response = self.client.post(

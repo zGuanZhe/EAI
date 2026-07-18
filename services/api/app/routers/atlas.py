@@ -17,6 +17,7 @@ from ..schemas.models import (
     PaperChatRequest,
 )
 from ..services.atlas import AtlasCandidateNotFoundError, AtlasResourceNotFoundError, AtlasService
+from ..services.provider import ProviderError
 
 
 def create_atlas_router(get_service: Callable[[], AtlasService]) -> APIRouter:
@@ -34,6 +35,8 @@ def create_atlas_router(get_service: Callable[[], AtlasService]) -> APIRouter:
             raise HTTPException(status_code=404, detail="candidate not found") from exc
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except ProviderError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     @router.get("/atlases")
     def list_atlases() -> list[dict[str, Any]]:

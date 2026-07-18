@@ -115,6 +115,53 @@ class ChangeReviewService:
         candidate = next((item for item in self.atlas.load_updates(atlas_id).candidates if item.id == candidate_id), None)
         return candidate.model_dump(mode="json").get(field) if candidate else None
 
+    def build_changeset_from_raw(
+        self,
+        thread: ThreadDoc,
+        run_id: str,
+        raw: dict[str, Any],
+    ) -> ChangeSet | None:
+        allowed_fields = {
+            "context": {"summary", "priority", "pinned", "agent_note", "include_in_agent", "selected_for_export", "cards"},
+            "object_memory": {"judgement", "note", "core_innovation", "core_technology", "evidence", "limitations", "reusable_insight", "tags", "maturity", "star"},
+            "atlas_candidate": {"title", "authors", "year", "venue", "url", "abstract", "suggested_route_id", "why", "relevance", "confidence", "status", "candidates"},
+            "canvas": {"title", "body", "status", "priority", "nodes", "edges", "label"},
+        }
+        operations = []
+        for index, item in enumerate((raw.get("operations") or [])[:24]):
+            if not isinstance(item, dict):
+                continue
+            target_type = safe_text(item.get("target_type"), 40)
+            path = safe_text(item.get("path"), 160)
+            op = safe_text(item.get("op") or "replace", 20)
+            if target_type not in allowed_fields or not path.startswith("/") or op not in {"add", "replace", "remove"}:
+                continue
+            if json_pointer_field(path) not in allowed_fields[target_type]:
+                continue
+            operation = ChangeOperation(
+                id=safe_text(item.get("id"), 100) or new_id(f"change_{index + 1}"),
+                target_type=target_type,
+                target=scrub_refs(item.get("target") or {}),
+                op=op,
+                path=path,
+                after=scrub_refs(item.get("after")),
+                reason=safe_text(item.get("reason"), 320),
+                risk=safe_text(item.get("risk"), 40) or "low",
+                selected=bool(item.get("selected", True)),
+            )
+            operation.before = self._current_value(thread, operation)
+            operations.append(operation)
+        if not operations:
+            return None
+        now = utc_now()
+        return ChangeSet(
+            id=new_id("changeset"), thread_id=thread.id, source_run_id=run_id,
+            base_revision=thread.revision,
+            summary=safe_text(raw.get("summary"), 300) or "Main Agent 生成的可确认修改",
+            risk=safe_text(raw.get("risk"), 40) or max((item.risk for item in operations), default="low"),
+            operations=operations, created_at=now, updated_at=now,
+        )
+
     def _conflicts(
         self,
         thread: ThreadDoc,

@@ -18,8 +18,6 @@ class AppServices:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self.agent_thread_lock = threading.RLock()
-        self.legacy_agent_event_buffers: dict[str, list[dict[str, Any]]] = {}
-        self.cancelled_legacy_agent_runs: set[str] = set()
         self._research_signature: tuple[Path, Path, Path] | None = None
         self._runtime_signature: tuple[Path, bool, int] | None = None
         self._research_store: ResearchStore | None = None
@@ -28,6 +26,7 @@ class AppServices:
         self._agent_runtime: AgentRuntimeV2 | None = None
         self._agent_api: AgentApiService | None = None
         self._campaign: CampaignService | None = None
+        self._domain_services: dict[str, tuple[tuple[Any, ...], Any]] = {}
 
     @property
     def agent_runtime_if_created(self) -> AgentRuntimeV2 | None:
@@ -102,6 +101,19 @@ class AppServices:
                 self._agent_api = factory()
             return self._agent_api
 
+    def domain_service(
+        self,
+        name: str,
+        signature: tuple[Any, ...],
+        factory: Callable[[], Any],
+    ) -> Any:
+        with self._lock:
+            current = self._domain_services.get(name)
+            if current is None or current[0] != signature:
+                current = (signature, factory())
+                self._domain_services[name] = current
+            return current[1]
+
     def reset_runtime(self) -> None:
         with self._lock:
             self._close_runtime_locked()
@@ -113,10 +125,9 @@ class AppServices:
             self._research_signature = None
 
     def _close_runtime_locked(self) -> None:
-        self.legacy_agent_event_buffers.clear()
-        self.cancelled_legacy_agent_runs.clear()
         self._agent_api = None
         self._campaign = None
+        self._domain_services.clear()
         if self._agent_runtime is not None:
             self._agent_runtime.close()
             self._agent_runtime = None

@@ -5,8 +5,10 @@ import os
 import urllib.error
 import urllib.request
 from pathlib import Path
+from collections.abc import Callable, Iterator
 from typing import Any
 
+from ..agent_v2.provider import request_text_stream, request_tool_decision
 from ..core.secrets import read_secret_data
 
 
@@ -42,7 +44,7 @@ def extract_provider_text(response: dict[str, Any]) -> str:
 
 
 class ProviderAdapter:
-    def __init__(self, secret_candidates: list[Path]) -> None:
+    def __init__(self, secret_candidates: list[Path | None] | tuple[Path | None, ...]) -> None:
         self.secret_candidates = secret_candidates
 
     @staticmethod
@@ -146,3 +148,90 @@ class ProviderAdapter:
             "你是严谨的中文学术研究助手。只基于用户提供的 Task Pack 回答，不编造论文细节。",
             model,
         )
+
+    @staticmethod
+    def profile_model(profile: str, overrides: dict[str, str] | None = None) -> str | None:
+        override = (overrides or {}).get(profile)
+        if override:
+            return str(override).strip()[:160]
+        value = os.environ.get(f"EAI_AGENT_MODEL_{profile.upper()}")
+        return str(value).strip()[:160] if value else None
+
+    @staticmethod
+    def _mock_chunks(text: str, size: int = 48) -> Iterator[str]:
+        for index in range(0, len(text), size):
+            yield text[index:index + size]
+
+    def route_model(self, prompt: str) -> str | None:
+        mock = os.environ.get("EAI_V2_MOCK_ROUTE")
+        if mock:
+            return mock
+        text, _ = self.call_text(
+            prompt,
+            "你是 EAI Desktop 服务路由器。普通交流必须选择 conversation；只返回符合 schema 的 JSON。",
+            self.profile_model("router"),
+        )
+        return text
+
+    def stream_model(
+        self,
+        prompt: str,
+        profile: str,
+        overrides: dict[str, str],
+        cancelled: Callable[[], bool],
+    ) -> tuple[Iterator[str], str, str]:
+        selected_model = self.profile_model(profile, overrides)
+        env_mock = os.environ.get("EAI_VNEXT_MOCK_OPENAI_RESPONSE")
+        if env_mock:
+            return self._mock_chunks(env_mock), "mock", selected_model or "mock-model"
+        secret_data, _ = read_secret_data(self.secret_candidates)
+        config = self._config(secret_data, selected_model)
+        if not config:
+            raise ProviderError(400, "未配置模型通道")
+        if config.get("mock_response"):
+            return self._mock_chunks(str(config["mock_response"])), config.get("provider") or "openai", config["model"]
+        iterator = request_text_stream(
+            config, prompt,
+            "你是 EAI Desktop 自适应研究总管。只输出用户可读的自然语言，不输出内部协议。",
+            cancelled=cancelled,
+        )
+        return iterator, config.get("provider") or "openai", config["model"]
+
+    def plan_model(self, prompt: str, overrides: dict[str, str]) -> str | None:
+        mock = os.environ.get("EAI_V2_MOCK_OPERATION_PLAN")
+        if mock:
+            return mock
+        text, _ = self.call_text(
+            prompt,
+            "你是 EAI Desktop 操作规划器。只输出最小、可确认、符合能力 schema 的 JSON。",
+            self.profile_model("planner", overrides),
+        )
+        return text
+
+    def tool_model(
+        self,
+        prompt: str,
+        tools: list[dict[str, Any]],
+        overrides: dict[str, str],
+    ) -> str | dict[str, Any] | None:
+        mock = os.environ.get("EAI_V2_MOCK_TOOL_DECISION")
+        if mock:
+            return mock
+        secret_data, _ = read_secret_data(self.secret_candidates)
+        config = self._config(secret_data, self.profile_model("planner", overrides))
+        if not config:
+            return None
+        if config.get("mock_response"):
+            return str(config["mock_response"])
+        return request_tool_decision(config, prompt, tools)
+
+    def campaign_plan_model(self, prompt: str) -> str | None:
+        mock = os.environ.get("EAI_CAMPAIGN_MOCK_BRANCH_PLAN")
+        if mock:
+            return mock
+        text, _ = self.call_text(
+            prompt,
+            "你是 EAI Desktop Campaign 实验规划器。只返回 JSON：title、plan、code。代码必须是单文件 Python，输出 EAI_METRIC JSON 行，不得访问宿主机或密钥。",
+            self.profile_model("coder"),
+        )
+        return text

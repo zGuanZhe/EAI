@@ -11,7 +11,6 @@ FAILURES: list[str] = []
 
 # Existing compatibility debt is frozen here and removed as domains are extracted.
 ROUTE_ALLOWLIST = {
-    "application.py",
     "agent_v2/router.py",
     "campaign/router.py",
     "research/router.py",
@@ -65,6 +64,8 @@ def mutable_literal(node: ast.AST) -> bool:
 
 
 application_route_count = 0
+module_graph: dict[str, set[str]] = {}
+source_trees: dict[str, ast.AST] = {}
 for path in sorted(APP.rglob("*.py")):
     rel = relative(path)
     try:
@@ -74,6 +75,22 @@ for path in sorted(APP.rglob("*.py")):
         continue
 
     modules = imported_modules(tree)
+    source_trees[rel] = tree
+    internal_dependencies: set[str] = set()
+    package_parts = list(Path(rel).parent.parts)
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom) or node.level <= 0:
+            continue
+        prefix = package_parts[: max(0, len(package_parts) - (node.level - 1))]
+        module_parts = (node.module or "").split(".") if node.module else []
+        candidate = "/".join(prefix + module_parts)
+        module_file = APP / f"{candidate}.py"
+        package_file = APP / candidate / "__init__.py"
+        if module_file.exists():
+            internal_dependencies.add(relative(module_file))
+        elif package_file.exists():
+            internal_dependencies.add(relative(package_file))
+    module_graph[rel] = internal_dependencies
     route_count = sum(
         1
         for node in ast.walk(tree)
@@ -85,6 +102,16 @@ for path in sorted(APP.rglob("*.py")):
         FAILURES.append(f"{rel}: HTTP routes belong in registered router modules")
     if rel == "application.py":
         application_route_count = route_count
+        allowed_functions = {
+            "utc_now", "ensure_dirs", "reset_app_services", "reset_agent_services", "app_lifespan",
+            "load_thread", "write_thread", "load_project", "write_project", "load_object_memory",
+            "effective_object_memory", "write_object_memory", "load_atlas_updates", "write_atlas_updates",
+            "atlas_bundle_for_update", "safe_markdown_text", "campaign_plan_model",
+        }
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if not (node.name in allowed_functions or node.name.startswith(("get_", "v2_"))):
+                    FAILURES.append(f"{rel}:{node.lineno}: non-assembly function '{node.name}' belongs in a service")
         for node in tree.body:
             if isinstance(node, ast.Assign):
                 names = [target.id for target in node.targets if isinstance(target, ast.Name)]
@@ -136,10 +163,21 @@ for path in sorted(APP.rglob("*.py")):
                 if value is not None and mutable_literal(value) and not name.isupper() and not name.startswith("__"):
                     FAILURES.append(f"{rel}:{node.lineno}: mutable module state '{name}' must live in application services")
 
-if application_route_count > 55:
-    FAILURES.append(
-        f"application.py: route count grew from the Workspace extraction baseline of 55 to {application_route_count}"
-    )
+if application_route_count:
+    FAILURES.append("application.py: HTTP routes must be registered from router modules")
+
+for entry in sorted(path for path in module_graph if path.startswith(("agent_v2/", "research/", "campaign/"))):
+    pending = list(module_graph[entry])
+    visited: set[str] = set()
+    while pending:
+        dependency = pending.pop()
+        if dependency in visited or dependency.startswith("schemas/"):
+            continue
+        visited.add(dependency)
+        if dependency.startswith("legacy/"):
+            FAILURES.append(f"{entry}: transitive dependency reaches {dependency}")
+            break
+        pending.extend(module_graph.get(dependency, ()))
 
 application_source = (APP / "application.py").read_text(encoding="utf-8")
 for forbidden_global in ("AGENT_V2_RUNTIME", "RESEARCH_STORE", "KNOWLEDGE_ENRICHMENT", "CAMPAIGN_SERVICE"):
@@ -153,6 +191,8 @@ if "create_atlas_router(get_atlas_service)" not in application_source:
     FAILURES.append("application.py: Atlas router must be registered through its service boundary")
 if "create_agent_v2_router(get_agent_api_service)" not in application_source:
     FAILURES.append("application.py: Agent v2 router must be registered through its service boundary")
+if "create_application" not in application_source or "ApplicationConfig" not in application_source:
+    FAILURES.append("application.py: isolated application construction must remain available")
 
 if FAILURES:
     print("\n".join(FAILURES), file=sys.stderr)
