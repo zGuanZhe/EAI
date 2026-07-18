@@ -19,6 +19,7 @@ ROUTE_ALLOWLIST = {
     "routers/drafts.py",
     "routers/workspace.py",
     "routers/atlas.py",
+    "routers/agent_v2.py",
 }
 DIRECT_REPOSITORY_ROUTER_ALLOWLIST = {"research/router.py"}
 
@@ -121,6 +122,8 @@ if "create_app(lifespan=app_lifespan)" not in application_source:
     FAILURES.append("application.py: AppServices must be owned by the ASGI lifespan")
 if "create_atlas_router(get_atlas_service)" not in application_source:
     FAILURES.append("application.py: Atlas router must be registered through its service boundary")
+if "create_agent_v2_router(get_agent_api_service)" not in application_source:
+    FAILURES.append("application.py: Agent v2 router must be registered through its service boundary")
 
 if FAILURES:
     print("\n".join(FAILURES), file=sys.stderr)

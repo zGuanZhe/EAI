@@ -5,6 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from ..agent_v2.runtime import AgentRuntimeV2
+from .agent_api import AgentApiService
 from ..campaign.service import CampaignService
 from ..research.enrichment import KnowledgeEnrichmentService
 from ..research.page_preview import PagePreviewService
@@ -15,12 +16,14 @@ from .projection import ProjectionService
 class AppServices:
     def __init__(self) -> None:
         self._lock = threading.RLock()
+        self.agent_thread_lock = threading.RLock()
         self._research_signature: tuple[Path, Path, Path] | None = None
         self._runtime_signature: tuple[Path, bool, int] | None = None
         self._research_store: ResearchStore | None = None
         self._enrichment: KnowledgeEnrichmentService | None = None
         self._page_preview: PagePreviewService | None = None
         self._agent_runtime: AgentRuntimeV2 | None = None
+        self._agent_api: AgentApiService | None = None
         self._campaign: CampaignService | None = None
 
     @property
@@ -86,6 +89,16 @@ class AppServices:
                 self._campaign = factory()
             return self._campaign
 
+    def agent_api(
+        self,
+        runtime: AgentRuntimeV2,
+        factory: Callable[[], AgentApiService],
+    ) -> AgentApiService:
+        with self._lock:
+            if self._agent_api is None or self._agent_api.runtime is not runtime:
+                self._agent_api = factory()
+            return self._agent_api
+
     def reset_runtime(self) -> None:
         with self._lock:
             self._close_runtime_locked()
@@ -97,6 +110,7 @@ class AppServices:
             self._research_signature = None
 
     def _close_runtime_locked(self) -> None:
+        self._agent_api = None
         self._campaign = None
         if self._agent_runtime is not None:
             self._agent_runtime.close()

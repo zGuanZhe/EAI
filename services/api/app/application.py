@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import threading
 import urllib.error
 import urllib.request
 import uuid
@@ -12,7 +11,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Callable, Iterator
 
-from fastapi import File, Form, HTTPException, UploadFile
+from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -35,17 +34,10 @@ from .legacy.runtime_context import (
     empty_agent_tool_context,
     record_agent_tool_result,
 )
-from .agent_v2.capabilities import capability_specs
-from .agent_v2.documents import import_open_source as import_open_runtime_source
 from .agent_v2.models import (
     AgentTurnRequest as AgentV2TurnRequest,
-    AgentTurnResponse as AgentV2TurnResponse,
-    AgentSteerRequest as AgentV2SteerRequest,
     ApprovalResolveRequest as AgentV2ApprovalResolveRequest,
-    DocumentRecord as AgentV2DocumentRecord,
     OperationBatch as AgentV2OperationBatch,
-    SourceSearchRequest as AgentV2SourceSearchRequest,
-    SourceSearchResponse as AgentV2SourceSearchResponse,
 )
 from .agent_v2.runtime import AgentRuntimeV2, RuntimeDependencies
 from .agent_v2.provider import request_text_stream, request_tool_decision
@@ -60,15 +52,16 @@ from .factory import create_app
 from .routers.system import create_system_router
 from .routers.drafts import create_draft_router
 from .routers.atlas import create_atlas_router
+from .routers.agent_v2 import create_agent_v2_router
 from .routers.workspace import create_workspace_router
 from .repositories.personal import safe_document_path, safe_object_memory_path
 from .services.projection import ProjectionService
 from .services.drafts import ThreadDraftService
 from .services.container import AppServices
 from .services.atlas import AtlasService
+from .services.agent_api import AgentApiService
 from .services.workspace import WorkspaceService
 from .research.context import build_research_state, evidence_bundle_to_sources, search_for_agent
-from .research.documents import import_document as import_research_document
 from .research.enrichment import KnowledgeEnrichmentService
 from .research.page_preview import PagePreviewService
 from .research.router import create_research_router
@@ -89,7 +82,6 @@ OBJECTS_DIR = RUNTIME_PATHS.objects_dir
 ATLAS_UPDATES_DIR = RUNTIME_PATHS.atlas_updates_dir
 LAB_RUNS_DIR = RUNTIME_PATHS.lab_runs_dir
 RUNTIME_V2_DIR = PERSONAL_DIR.parent / "runtime"
-AGENT_V2_THREAD_LOCK = threading.RLock()
 APP_SERVICES = AppServices()
 
 SECRET_CANDIDATES = secret_candidates()
@@ -4852,7 +4844,7 @@ def v2_campaign_execute(capability_id: str, arguments: dict[str, Any], thread_id
 
 
 def v2_persist_assistant(thread_id: str, message_id: str, content: str, status: str, refs: dict[str, Any]) -> dict[str, Any]:
-    with AGENT_V2_THREAD_LOCK:
+    with APP_SERVICES.agent_thread_lock:
         doc = load_thread(thread_id)
         assistant = find_message(doc, message_id)
         assistant.content = safe_markdown_text(content, 12000) or "本轮任务已完成。"
@@ -4962,7 +4954,7 @@ def v2_canvas_apply(canvas: CanvasState, arguments: dict[str, Any]) -> list[dict
 
 
 def v2_apply_operation_batch(batch: AgentV2OperationBatch, resolution: AgentV2ApprovalResolveRequest) -> dict[str, Any]:
-    with AGENT_V2_THREAD_LOCK:
+    with APP_SERVICES.agent_thread_lock:
         doc = load_thread(batch.thread_id)
         if doc.revision != batch.base_revision:
             raise HTTPException(status_code=409, detail={"message": "线程在确认前发生变化", "expected_revision": batch.base_revision, "current_revision": doc.revision})
@@ -5101,7 +5093,7 @@ def v2_apply_operation_batch(batch: AgentV2OperationBatch, resolution: AgentV2Ap
 
 
 def v2_undo_operation_batch(batch: AgentV2OperationBatch) -> dict[str, Any]:
-    with AGENT_V2_THREAD_LOCK:
+    with APP_SERVICES.agent_thread_lock:
         if batch.status != "applied":
             raise HTTPException(status_code=409, detail="只有已应用的操作批次可以撤销")
         doc = load_thread(batch.thread_id)
@@ -5288,278 +5280,19 @@ def get_campaign_service() -> CampaignService:
     return APP_SERVICES.campaign(runtime, create_campaign)
 
 
-@app.post("/api/vnext/threads/{thread_id}/agent-v2/turns", response_model=AgentV2TurnResponse)
-def start_agent_v2_turn(thread_id: str, payload: AgentV2TurnRequest) -> AgentV2TurnResponse:
-    message = safe_message_content(payload.message, 8000)
-    with AGENT_V2_THREAD_LOCK:
-        runtime = get_agent_v2_runtime()
-        active = next(
-            (
-                task
-                for task in runtime.store.list_tasks(
-                    thread_id=thread_id,
-                    statuses={"pending", "running"},
-                )
-                if task.parent_task_id is None
-            ),
-            None,
-        )
-        if active:
-            raise HTTPException(
-                status_code=409,
-                detail={"message": "当前线程已有进行中的 Main Agent 任务", "task_id": active.id, "status": active.status},
-            )
-        doc = load_thread(thread_id)
-        task_id = slug_id("agent_task")
-        user = append_message(
-            doc,
-            Message(
-                role="user", kind="text", content=message, surface=payload.surface or "thread",
-                refs={"turn_attachments": [scrub_refs(item) for item in payload.turn_attachments[:8]], "agent_runtime": "v2", "agent_v2_task_id": task_id},
-            ),
-        )
-        assistant = append_message(
-            doc,
-            Message(
-                role="assistant", kind="assistant_reply", content="正在理解你的目标...", status="pending", surface="thread",
-                refs={"agent_runtime": "v2", "agent_v2_task_id": task_id, "service_status": "intake"},
-            ),
-        )
-        doc.active_surface = "thread"
-        updated = write_thread(doc)
-    task = runtime.create_task(
-        thread_id=thread_id,
-        turn_id=user.id or "",
-        assistant_message_id=assistant.id or "",
-        request=AgentV2TurnRequest.model_validate({**payload.model_dump(mode="json"), "message": message}),
-        task_id=task_id,
-    )
-    return AgentV2TurnResponse(
-        thread=updated.model_dump(mode="json"), task=task, user_message_id=user.id or "", assistant_message_id=assistant.id or "",
-    )
-
-
-@app.get("/api/vnext/agent-v2/tasks/{task_id}")
-def get_agent_v2_task(task_id: str) -> dict[str, Any]:
+def get_agent_api_service() -> AgentApiService:
     runtime = get_agent_v2_runtime()
-    task = runtime.store.get_task(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Agent v2 task not found")
-    attempts = runtime.store.list_attempts(task_id)
-    active_attempt = runtime.store.get_attempt(task.active_attempt_id) if task.active_attempt_id else None
-    return {
-        "task": task.model_dump(mode="json"),
-        "attempts": [item.model_dump(mode="json") for item in attempts],
-        "tool_calls": [item.model_dump(mode="json") for item in runtime.store.list_tool_calls(task.active_attempt_id)] if task.active_attempt_id else [],
-        "observations": [item.model_dump(mode="json") for item in runtime.store.list_observations(task.active_attempt_id)] if task.active_attempt_id else [],
-        "active_attempt": active_attempt.model_dump(mode="json") if active_attempt else None,
-        "sources": [source.model_dump(mode="json") for source in runtime.store.list_sources(task_id)],
-        "artifacts": [artifact.model_dump(mode="json") for artifact_id in task.artifact_ids if (artifact := runtime.store.get_artifact(artifact_id))],
-        "approvals": [approval.model_dump(mode="json") for approval_id in task.approval_ids if (approval := runtime.store.get_approval(approval_id))],
-        "operation_batches": [batch.model_dump(mode="json") for batch in runtime.store.list_operation_batches(task_id)],
-    }
-
-
-@app.get("/api/vnext/agent-v2/tasks/{task_id}/audit")
-def get_agent_v2_task_audit(task_id: str, attempt_id: str | None = None) -> dict[str, Any]:
-    runtime = get_agent_v2_runtime()
-    task = runtime.store.get_task(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Agent v2 task not found")
-    selected = attempt_id or task.active_attempt_id
-    attempt = runtime.store.get_attempt(selected) if selected else None
-    if not attempt or attempt.task_id != task_id:
-        raise HTTPException(status_code=404, detail="Agent attempt not found")
-    return {
-        "task_id": task_id,
-        "attempt": attempt.model_dump(mode="json"),
-        "tool_calls": [item.model_dump(mode="json") for item in runtime.store.list_tool_calls(selected)],
-        "observations": [item.model_dump(mode="json") for item in runtime.store.list_observations(selected)],
-        "events": [item.model_dump(mode="json") for item in runtime.store.list_events(task_id)],
-    }
-
-
-@app.post("/api/vnext/agent-v2/tasks/{task_id}/steer")
-def steer_agent_v2_task(task_id: str, payload: AgentV2SteerRequest) -> dict[str, Any]:
-    runtime = get_agent_v2_runtime()
-    try:
-        task = runtime.steer(task_id, safe_message_content(payload.message, 2000))
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    with AGENT_V2_THREAD_LOCK:
-        doc = load_thread(task.thread_id)
-        append_message(doc, Message(
-            role="user", kind="text", content=safe_message_content(payload.message, 2000), surface="thread",
-            refs={"agent_runtime": "v2", "steers_task_id": task.id, "agent_v2_attempt_id": task.active_attempt_id},
-        ))
-        updated = write_thread(doc)
-    return {"task": task.model_dump(mode="json"), "thread": updated.model_dump(mode="json")}
-
-
-@app.get("/api/vnext/agent-v2/tasks/{task_id}/events")
-def stream_agent_v2_events(task_id: str, after_seq: int = 0) -> StreamingResponse:
-    return StreamingResponse(
-        get_agent_v2_runtime().event_stream(task_id, max(0, after_seq)),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
-
-
-@app.post("/api/vnext/agent-v2/tasks/{task_id}/cancel")
-def cancel_agent_v2_task(task_id: str) -> dict[str, Any]:
-    try:
-        task = get_agent_v2_runtime().cancel(task_id)
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return {"task": task.model_dump(mode="json")}
-
-
-@app.post("/api/vnext/agent-v2/tasks/{task_id}/resume")
-def resume_agent_v2_task(task_id: str) -> dict[str, Any]:
-    try:
-        task = get_agent_v2_runtime().resume(task_id)
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"task": task.model_dump(mode="json")}
-
-
-@app.post("/api/vnext/agent-v2/approvals/{approval_id}/resolve")
-def resolve_agent_v2_approval(approval_id: str, payload: AgentV2ApprovalResolveRequest) -> dict[str, Any]:
-    existing = get_agent_v2_runtime().store.get_approval(approval_id)
-    if existing and existing.task_id.startswith("campaign:"):
-        try:
-            return get_campaign_service().resolve_approval(approval_id, payload)
-        except KeyError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
-        except ValueError as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
-    try:
-        approval, task = get_agent_v2_runtime().resolve_approval(approval_id, payload)
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"approval": approval.model_dump(mode="json"), "task": task.model_dump(mode="json")}
-
-
-@app.get("/api/vnext/agent-v2/approvals/{approval_id}")
-def get_agent_v2_approval(approval_id: str) -> dict[str, Any]:
-    approval = get_agent_v2_runtime().store.get_approval(approval_id)
-    if not approval:
-        raise HTTPException(status_code=404, detail="approval not found")
-    return approval.model_dump(mode="json")
-
-
-@app.get("/api/vnext/agent-v2/operation-batches/{batch_id}")
-def get_agent_v2_operation_batch(batch_id: str) -> dict[str, Any]:
-    batch = get_agent_v2_runtime().store.get_operation_batch(batch_id)
-    if not batch:
-        raise HTTPException(status_code=404, detail="Agent v2 operation batch not found")
-    return {"operation_batch": batch.model_dump(mode="json")}
-
-
-@app.post("/api/vnext/agent-v2/operation-batches/{batch_id}/undo")
-def undo_agent_v2_operation_batch(batch_id: str) -> dict[str, Any]:
-    batch = get_agent_v2_runtime().store.get_operation_batch(batch_id)
-    if not batch:
-        raise HTTPException(status_code=404, detail="Agent v2 operation batch not found")
-    return v2_undo_operation_batch(batch)
-
-
-@app.get("/api/vnext/agent-v2/capabilities")
-def list_agent_v2_capabilities() -> list[dict[str, Any]]:
-    return [spec.model_dump(mode="json") for spec in capability_specs()]
-
-
-@app.post("/api/vnext/sources/search", response_model=AgentV2SourceSearchResponse)
-def search_agent_v2_sources(payload: AgentV2SourceSearchRequest) -> AgentV2SourceSearchResponse:
-    atlas_id = "G"
-    if payload.thread_id:
-        atlas_id = load_thread(payload.thread_id).active_atlas_id
-    query = safe_message_content(payload.query, 1200)
-    runtime = get_agent_v2_runtime()
-    local_sources = []
-    if payload.source_policy == "atlas_only":
-        local_sources = runtime.sources.search_atlas(atlas_id, query, None, payload.limit)
-    elif payload.source_policy in {"local_only", "local_and_external"}:
-        _, local_sources = search_for_agent(
-            get_research_store(), query=query, atlas_id=atlas_id, task_id=None, attachments=[], limit=payload.limit,
-        )
-    warnings: list[str] = []
-    sources = local_sources
-    if payload.source_policy in {"external_only", "local_and_external"}:
-        external, warnings = runtime.sources.search(
-            query=query, atlas_id=atlas_id, task_id=None, source_policy="external_only",
-            providers=payload.providers or None, limit=payload.limit,
-        )
-        sources = runtime.sources.deduplicate(local_sources + external)[:payload.limit]
-    return AgentV2SourceSearchResponse(query=payload.query, sources=sources, warnings=warnings)
-
-
-@app.get("/api/vnext/sources/{source_id}")
-def get_agent_v2_source(source_id: str) -> dict[str, Any]:
-    source = get_agent_v2_runtime().store.get_source(source_id)
-    if not source:
-        raise HTTPException(status_code=404, detail="source not found")
-    return source.model_dump(mode="json")
-
-
-@app.post("/api/vnext/documents/import", response_model=AgentV2DocumentRecord)
-async def import_agent_v2_document(
-    file: UploadFile = File(...),
-    title: str | None = Form(default=None),
-) -> AgentV2DocumentRecord:
-    content = await file.read(100 * 1024 * 1024 + 1)
-    if len(content) > 100 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="文档超过 100 MB 限制")
-    try:
-        document = import_research_document(
+    return APP_SERVICES.agent_api(
+        runtime,
+        lambda: AgentApiService(
+            runtime,
+            get_workspace_service(),
             get_research_store(),
-            file_name=file.filename or "document",
-            media_type=file.content_type or "application/octet-stream",
-            content=content,
-            title=title,
-        )
-        return AgentV2DocumentRecord(
-            id=document["id"], title=document["title"], file_name=document["data"].get("file_name") or file.filename or "document",
-            media_type=document["media_type"], path=document["blob_path"], content_hash=document["content_hash"],
-            page_count=document["page_count"], chunk_count=document["data"].get("chunk_count") or 0,
-            created_at=document["created_at"],
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@app.post("/api/vnext/documents/import-source/{source_id}", response_model=AgentV2DocumentRecord)
-def import_agent_v2_open_source(source_id: str) -> AgentV2DocumentRecord:
-    runtime = get_agent_v2_runtime()
-    source = runtime.store.get_source(source_id)
-    if not source:
-        raise HTTPException(status_code=404, detail="source not found")
-    try:
-        imported = import_open_runtime_source(
-            runtime.store, source, created_at=utc_now(), client_factory=runtime.sources.client_factory
-        )
-        source_ref = source.locator if isinstance(source.locator, dict) else {}
-        research_document = import_research_document(
-            get_research_store(), file_name=imported.file_name, media_type=imported.media_type,
-            content=Path(imported.path).read_bytes(), title=imported.title,
-            work_id=source_ref.get("work_id"), source_kind="open_access", access="open", evictable=True,
-        )
-        return AgentV2DocumentRecord(
-            id=research_document["id"], title=research_document["title"],
-            file_name=research_document["data"].get("file_name") or imported.file_name,
-            media_type=research_document["media_type"], path=research_document["blob_path"],
-            content_hash=research_document["content_hash"], page_count=research_document["page_count"],
-            chunk_count=research_document["data"].get("chunk_count") or 0,
-            created_at=research_document["created_at"],
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+            get_campaign_service=get_campaign_service,
+            undo_operation_batch=v2_undo_operation_batch,
+            thread_lock=APP_SERVICES.agent_thread_lock,
+        ),
+    )
 
 
 @app.get("/api/vnext/secrets/status")
@@ -5572,3 +5305,4 @@ def secrets_status() -> dict[str, Any]:
 
 app.include_router(create_research_router(get_research_store, get_knowledge_enrichment, get_page_preview_service))
 app.include_router(create_campaign_router(get_campaign_service))
+app.include_router(create_agent_v2_router(get_agent_api_service))
