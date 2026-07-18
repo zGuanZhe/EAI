@@ -26,12 +26,12 @@
 .knowledge-job progress { width: 100%; height: 4px; accent-color: var(--cyan); }
 .knowledge-job-actions { display: flex; gap: 4px; }
 .knowledge-job-actions button { width: 30px; padding: 0; }
-.maintenance-list { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px; }
-.maintenance-list .ui-activity-row { grid-template-columns: 34px minmax(0,1fr); align-content: start; border-bottom: 0; background: var(--panel-soft); border-radius: 10px; padding: 13px; }
+.maintenance-list { display: grid; }
+.maintenance-list .ui-activity-row { padding-inline: 4px; }
 .run-center-advanced { padding-top: 10px; border-top: 1px solid var(--line); }
 .run-center-advanced summary { cursor: pointer; color: var(--muted); font-size: 12px; font-weight: 700; }
 .run-center-advanced button, .run-center-advanced a { display: inline-flex; min-height: 32px; align-items: center; gap: 6px; margin: 10px 12px 0 0; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; text-decoration: none; }
 @media (max-width: 900px) { .knowledge-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .knowledge-job { grid-template-columns: 18px minmax(0, 1fr) auto; } .knowledge-job progress { grid-column: 2 / -1; grid-row: 2; } .knowledge-job > em { display: none; } }
-@media (max-width: 760px) { .run-center-body { width: calc(100% - 28px); } .maintenance-list { grid-template-columns: 1fr; } .knowledge-runtime-line { align-items: flex-start; flex-direction: column; gap: 8px; padding: 12px 0; } .knowledge-runtime-line > div { width: 100%; margin-left: 0; } }
+@media (max-width: 760px) { .run-center-body { width: calc(100% - 28px); } .knowledge-runtime-line { align-items: flex-start; flex-direction: column; gap: 8px; padding: 12px 0; } .knowledge-runtime-line > div { width: 100%; margin-left: 0; } }
 
 @media (prefers-reduced-motion: reduce) { .knowledge-meter i { transition: none; } }

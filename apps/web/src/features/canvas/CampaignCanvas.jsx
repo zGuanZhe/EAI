@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
 import {
-  Archive, BookOpen, Check, ChevronRight, CirclePause, CirclePlay, Code2, Download,
+  Archive, BookOpen, Check, ChevronRight, CirclePause, Code2, Download,
   FileArchive, FileText, FlaskConical, GitBranch, GitCompare, MessageSquareText,
   PackageOpen, Play, Search, ShieldCheck, Sparkles, Square, X
 } from "lucide-react";
 import { Button, Drawer, EmptyState, InlineNotice, SegmentedControl, StatusDot, cx } from "../../components/ui/index.jsx";
 import { useMediaQuery } from "../../app/useMediaQuery.js";
-import { buildCampaignTree, CAMPAIGN_STAGE_LABELS } from "./model.js";
+import { buildCampaignTree, CAMPAIGN_STAGE_LABELS, getCampaignNextStep } from "./model.js";
 
 const STATUS_LABELS = {
   ready: "就绪", running: "运行中", waiting_approval: "等待确认", paused: "已暂停",
@@ -49,6 +49,21 @@ function IdeaPreview({ preview, busy, runtimeStatus, executionProfile, onExecuti
 
 function StageTrack({ stages, currentStageId }) {
   return <div className="campaign-stage-track" aria-label="Campaign 阶段">{stages.map((stage) => <div className={cx(stage.id === currentStageId && "active", stage.status === "completed" && "completed")} key={stage.id}><i /><span>{stage.title || CAMPAIGN_STAGE_LABELS[stage.kind] || stage.kind}</span><small>{stage.status === "completed" ? "完成" : stage.id === currentStageId ? "当前" : ""}</small></div>)}</div>;
+}
+
+function CampaignNextAction({ value, busy, onAction }) {
+  if (!value) return null;
+  return (
+    <section className="campaign-next-action" aria-label="Campaign 下一动作">
+      <div><span>当前阶段</span><strong>{value.stageLabel}</strong></div>
+      <div><strong>{value.title}</strong><p>{value.description}</p></div>
+      {value.action ? (
+        <Button variant="primary" disabled={busy} onClick={() => onAction(value)}>{value.label}<ChevronRight size={14} /></Button>
+      ) : (
+        <StatusDot status={value.status || "idle"} label={value.passiveLabel || "状态已固定"} />
+      )}
+    </section>
+  );
 }
 
 function RuntimeNotice({ runtime, profile, onInstall }) {
@@ -154,10 +169,38 @@ export function CampaignCanvas({ controller, sourceNode, onAskMainAgent }) {
   if (!active) return <div className="campaign-empty"><EmptyState icon={<FlaskConical size={22} />} title="还没有研究 Campaign" description="从问题或假设生成候选研究想法。Agent 会先检查 Atlas 与可用原文；实验始终在隔离 Runtime 中执行。" action={<Button variant="primary" disabled={controller.busy} onClick={() => controller.previewIdeas(sourceNode)}><Search size={14} />生成研究想法</Button>} /></div>;
   const campaign = active.campaign;
   const currentStage = campaign.stages.find((item) => item.id === campaign.current_stage_id);
+  const nextStep = getCampaignNextStep(active, controller.pendingApproval);
   const toggleBranch = (id) => controller.setSelectedBranchIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id].slice(-6));
+  const runNextStep = (step) => {
+    if (step.action === "start" || step.action === "resume") {
+      controller.campaignAction(campaign.id, step.action);
+      return;
+    }
+    if (step.action === "inspect_branch") {
+      setView("experiments");
+      controller.setSelectedBranchId(step.branchId);
+      return;
+    }
+    if (step.action === "generate_manuscript") {
+      setView("manuscript");
+      controller.generateManuscript(campaign.id);
+      return;
+    }
+    if (step.action === "start_review") {
+      setView("reviews");
+      controller.startReview(campaign.id, step.manuscriptId);
+      return;
+    }
+    if (step.action === "open_manuscript") setView("manuscript");
+    if (step.action === "open_artifacts") setView("artifacts");
+  };
   return <div className={cx("campaign-workspace", controller.selectedBranchId && "inspector-open")}>
-    <header className="campaign-header"><div><span>{campaign.source_kind === "legacy_lab" ? "历史 Campaign" : "AI Scientist v2 Campaign"}</span><h2>{campaign.title}</h2><p>{campaign.hypothesis}</p></div><div className="campaign-header-actions"><select value={campaign.id} onChange={(event) => controller.setActiveCampaignId(event.target.value)}>{controller.campaigns.map((item) => <option value={item.campaign.id} key={item.campaign.id}>{item.campaign.title}</option>)}</select>{campaign.status === "ready" && <Button variant="primary" onClick={() => controller.campaignAction(campaign.id, "start")}><CirclePlay size={14} />启动</Button>}{campaign.status === "running" && <Button variant="secondary" onClick={() => controller.campaignAction(campaign.id, "pause")}><CirclePause size={14} />暂停</Button>}{["paused", "interrupted"].includes(campaign.status) && <Button variant="primary" onClick={() => controller.campaignAction(campaign.id, "resume")}><CirclePlay size={14} />继续</Button>}{["running", "waiting_approval", "paused"].includes(campaign.status) && <Button variant="quiet" onClick={() => controller.campaignAction(campaign.id, "cancel")}><Square size={13} />停止</Button>}</div></header>
-    <StageTrack stages={campaign.stages} currentStageId={campaign.current_stage_id} />
+    <header className="campaign-header"><div><span>{campaign.source_kind === "legacy_lab" ? "历史 Campaign" : "AI Scientist v2 Campaign"}</span><h2>{campaign.title}</h2><p>{campaign.hypothesis}</p></div><div className="campaign-header-actions"><select value={campaign.id} onChange={(event) => controller.setActiveCampaignId(event.target.value)}>{controller.campaigns.map((item) => <option value={item.campaign.id} key={item.campaign.id}>{item.campaign.title}</option>)}</select>{campaign.status === "running" && <Button variant="secondary" onClick={() => controller.campaignAction(campaign.id, "pause")}><CirclePause size={14} />暂停</Button>}{["running", "waiting_approval", "paused"].includes(campaign.status) && <Button variant="quiet" onClick={() => controller.campaignAction(campaign.id, "cancel")}><Square size={13} />停止</Button>}</div></header>
+    <CampaignNextAction value={nextStep} busy={controller.busy} onAction={runNextStep} />
+    <details className="campaign-stage-disclosure">
+      <summary>查看完整阶段路径</summary>
+      <StageTrack stages={campaign.stages} currentStageId={campaign.current_stage_id} />
+    </details>
     <div className="campaign-viewbar"><SegmentedControl value={view} options={VIEW_OPTIONS} onChange={setView} label="Campaign 工作区" /><div><StatusDot status={campaign.status} label={STATUS_LABELS[campaign.status] || campaign.status} /><span>{currentStage?.title || "尚未开始"}</span></div></div>
     <main className="campaign-view-content">
       {view === "overview" && <OverviewView snapshot={active} runtime={controller.runtimeStatus} profile={controller.executionProfile} onInstall={controller.installRuntime} />}

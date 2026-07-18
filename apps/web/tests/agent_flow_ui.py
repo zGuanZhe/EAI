@@ -331,9 +331,12 @@ with sync_playwright() as playwright:
     idea_preview.get_by_role("button", name="选择并创建 Campaign").first.click()
     campaign_workspace = page.locator(".campaign-workspace")
     campaign_workspace.wait_for(state="visible")
-    campaign_workspace.get_by_role("button", name="启动").click()
+    assert "生成首轮独立实验分支" in campaign_workspace.locator(".campaign-next-action").inner_text()
+    assert campaign_workspace.locator(".campaign-stage-disclosure").get_attribute("open") is None
+    campaign_workspace.get_by_role("button", name="启动 Campaign", exact=True).click()
     campaign_workspace.get_by_role("button", name="实验树", exact=True).click()
     page.locator(".campaign-branch").first.wait_for(state="visible")
+    page.get_by_role("button", name="检查实验计划").wait_for(state="visible")
     assert page.locator(".campaign-branch").count() == 3
     page.locator(".campaign-branch").first.click()
     branch_drawer = page.locator(".campaign-branch-drawer")
@@ -360,6 +363,9 @@ with sync_playwright() as playwright:
     assert knowledge_section.get_by_role("button", name="补全热集全文").count() == 1
     page.screenshot(path=str(RESULTS / "run-center-desktop.png"))
     assert page.locator(".lab-workspace").count() == 0
+    maintenance_rows = page.locator(".maintenance-list .ui-activity-row")
+    assert maintenance_rows.count() == 3
+    assert page.locator(".maintenance-list button.ui-activity-row").count() == 2
 
     medium = browser.new_page(viewport={"width": 1180, "height": 820})
     medium.goto(BASE_URL, wait_until="networkidle")

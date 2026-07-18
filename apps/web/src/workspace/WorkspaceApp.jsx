@@ -1135,8 +1135,20 @@ export function App() {
     setStatus("已取消写入预览");
   }
 
-  function openToolsAction(action) {
+  function openToolsAction(action, targetId = null) {
     setToolsPage(false);
+    if (action === "changeset") {
+      setActiveChangesetId(targetId);
+      setSurface("thread");
+      setRail("changes");
+      setRailOpen(true);
+      setContextDrawerOpen(false);
+      return;
+    }
+    if (action === "settings") {
+      openSettings();
+      return;
+    }
     if (action === "copy") {
       setSurface("thread");
       setContextDrawerOpen(true);

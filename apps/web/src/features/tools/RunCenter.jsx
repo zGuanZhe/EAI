@@ -1,4 +1,4 @@
-import { Archive, BookOpenCheck, Clock3, Database, FileText, KeyRound, Pause, Play, RefreshCcw, RotateCcw, ShieldCheck, Sparkles, Square } from "lucide-react";
+import { Archive, BookOpenCheck, ChevronRight, Clock3, Database, FileText, KeyRound, Pause, Play, RefreshCcw, RotateCcw, ShieldCheck, Sparkles, Square } from "lucide-react";
 import { ActivityRow, EmptyState, StatusDot, SurfaceHeader } from "../../components/ui/index.jsx";
 import "./tools.css";
 
@@ -34,7 +34,7 @@ export function RunCenter({
         />
         <section>
           <header><ShieldCheck size={16} /><strong>待确认变更</strong><span>{changes.length} 项</span></header>
-          {changes.map((item) => <ActivityRow key={item.id} tone="orange" icon={<ShieldCheck size={15} />} title={item.summary} meta={item.status === "conflicted" ? "存在冲突" : `${item.operations?.length || 0} 项修改`} description={item.risk === "high" ? "高风险变更，请逐字段检查。" : "等待用户确认后写入个人数据。"} />)}
+          {changes.map((item) => <ActivityRow key={item.id} tone="orange" icon={<ShieldCheck size={15} />} title={item.summary} meta={item.status === "conflicted" ? "存在冲突" : `${item.operations?.length || 0} 项修改`} description={item.risk === "high" ? "高风险变更，请逐字段检查。" : "等待用户确认后写入个人数据。"} actions={<ChevronRight size={15} />} onClick={() => onAction?.("changeset", item.id)} />)}
           {!changes.length && <EmptyState title="没有待确认变更" description="Main Agent 的修改建议会以可撤销的 ChangeSet 出现在这里。" />}
         </section>
         <section>
@@ -45,9 +45,9 @@ export function RunCenter({
         <section>
           <header><Sparkles size={16} /><strong>维护与高级能力</strong><span>按需使用</span></header>
           <div className="maintenance-list">
-            <ActivityRow tone="cyan" icon={<RotateCcw size={15} />} title="质量与 Bundle 健康" description="检查 Atlas 缓存和基础数据状态。" />
-            <ActivityRow tone="violet" icon={<KeyRound size={15} />} title="模型通道" description="密钥由桌面系统凭据管理。" />
-            <ActivityRow tone="green" icon={<Archive size={15} />} title="个人数据备份" description="查看线程、项目和对象记忆的安全快照。" />
+            <ActivityRow tone="cyan" icon={<RotateCcw size={15} />} title="质量与 Bundle 健康" description="重新检查 Atlas 缓存和基础数据状态。" actions={<ChevronRight size={15} />} onClick={() => onRefreshKnowledge?.()} />
+            <ActivityRow tone="violet" icon={<KeyRound size={15} />} title="模型通道" description="密钥由桌面系统凭据管理。" actions={<ChevronRight size={15} />} onClick={() => onAction?.("settings")} />
+            <ActivityRow tone="green" icon={<Archive size={15} />} title="个人数据备份状态" meta="自动维护" description="迁移、删除与关键写入会保留受限恢复副本。" />
           </div>
           <details className="run-center-advanced">
             <summary>高级互操作与旧系统归档</summary>

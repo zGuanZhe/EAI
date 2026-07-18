@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildArgumentFlow, buildCampaignTree, canonicalNodeType } from "../src/features/canvas/model.js";
+import { buildArgumentFlow, buildCampaignTree, canonicalNodeType, getCampaignNextStep } from "../src/features/canvas/model.js";
 
 describe("buildArgumentFlow", () => {
   it("orders a vertical argument chain and keeps branch depth", () => {
@@ -60,5 +60,50 @@ describe("canonicalNodeType", () => {
     expect(canonicalNodeType("material")).toBe("evidence");
     expect(canonicalNodeType("conclusion")).toBe("decision");
     expect(canonicalNodeType("finding")).toBe("finding");
+  });
+});
+
+describe("getCampaignNextStep", () => {
+  const campaign = {
+    id: "campaign-1",
+    status: "running",
+    current_stage_id: "stage-2",
+    stages: [{ id: "stage-2", kind: "initial_implementation", title: "初始实现" }]
+  };
+
+  it("prioritizes an approval over other branch work", () => {
+    const step = getCampaignNextStep(
+      { campaign, branches: [{ id: "branch-1", stage_id: "stage-2", status: "proposed" }] },
+      { payload: { campaign_id: "campaign-1", branch_id: "branch-1" } }
+    );
+    expect(step.action).toBe("inspect_branch");
+    expect(step.branchId).toBe("branch-1");
+    expect(step.label).toBe("检查执行授权");
+  });
+
+  it("moves successful experiments toward explicit review and stage advance", () => {
+    const step = getCampaignNextStep({
+      campaign,
+      branches: [{ id: "branch-1", stage_id: "stage-2", status: "succeeded" }]
+    });
+    expect(step.action).toBe("inspect_branch");
+    expect(step.label).toBe("检查并推进");
+  });
+
+  it("routes writeup and review stages to their real workflow actions", () => {
+    const writeup = getCampaignNextStep({
+      campaign: { ...campaign, current_stage_id: "stage-6", stages: [{ id: "stage-6", kind: "writeup", title: "写作" }] },
+      branches: [],
+      manuscripts: []
+    });
+    expect(writeup.action).toBe("generate_manuscript");
+
+    const review = getCampaignNextStep({
+      campaign: { ...campaign, current_stage_id: "stage-7", current_manuscript_id: "manuscript-1", stages: [{ id: "stage-7", kind: "review", title: "审稿" }] },
+      branches: [],
+      manuscripts: [{ id: "manuscript-1" }]
+    });
+    expect(review.action).toBe("start_review");
+    expect(review.manuscriptId).toBe("manuscript-1");
   });
 });
