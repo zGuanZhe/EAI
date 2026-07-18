@@ -104,9 +104,6 @@ class VNextServiceTest(unittest.TestCase):
             "ATLAS_UPDATES_DIR": main.ATLAS_UPDATES_DIR,
             "LAB_RUNS_DIR": main.LAB_RUNS_DIR,
             "RUNTIME_V2_DIR": main.RUNTIME_V2_DIR,
-            "RESEARCH_STORE": main.RESEARCH_STORE,
-            "AGENT_V2_RUNTIME": main.AGENT_V2_RUNTIME,
-            "CAMPAIGN_SERVICE": main.CAMPAIGN_SERVICE,
         }
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -120,9 +117,7 @@ class VNextServiceTest(unittest.TestCase):
                 main.ATLAS_UPDATES_DIR = personal / "atlas_updates"
                 main.LAB_RUNS_DIR = personal / "lab_runs"
                 main.RUNTIME_V2_DIR = root / "runtime"
-                main.RESEARCH_STORE = None
-                main.AGENT_V2_RUNTIME = None
-                main.CAMPAIGN_SERVICE = None
+                main.reset_app_services()
                 main.ensure_dirs()
 
                 client = TestClient(main.app)
@@ -132,10 +127,8 @@ class VNextServiceTest(unittest.TestCase):
                 )
                 self.assertEqual(created.status_code, 200, created.text)
                 thread = created.json()
-                main.get_agent_v2_runtime().close()
-                main.AGENT_V2_RUNTIME = None
-                main.RESEARCH_STORE.close()
-                main.RESEARCH_STORE = None
+                main.get_agent_v2_runtime()
+                main.reset_app_services()
 
                 research_db = root / "research" / "research.db"
                 connection = sqlite3.connect(research_db)
@@ -177,19 +170,11 @@ class VNextServiceTest(unittest.TestCase):
                     self.assertIsInstance(detail, dict, f"{name}: {response.text}")
                     self.assertEqual(detail["code"], "schema_newer_than_app")
 
-                if main.AGENT_V2_RUNTIME is not None:
-                    main.AGENT_V2_RUNTIME.close()
-                    main.AGENT_V2_RUNTIME = None
-                if main.RESEARCH_STORE is not None:
-                    main.RESEARCH_STORE.close()
-                    main.RESEARCH_STORE = None
+                main.reset_app_services()
                 self.assertEqual(research_db.read_bytes(), research_before)
                 self.assertEqual(runtime_db.read_bytes(), runtime_before)
             finally:
-                if main.AGENT_V2_RUNTIME is not None:
-                    main.AGENT_V2_RUNTIME.close()
-                if main.RESEARCH_STORE is not None:
-                    main.RESEARCH_STORE.close()
+                main.reset_app_services()
                 for name, value in original.items():
                     setattr(main, name, value)
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hmac
 import os
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,8 +22,8 @@ class DesktopSessionMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-def create_app() -> FastAPI:
-    app = FastAPI(title="EAI Desktop Service", version="0.5.0")
+def create_app(*, lifespan: Any = None) -> FastAPI:
+    app = FastAPI(title="EAI Desktop Service", version="0.5.0", lifespan=lifespan)
     app.add_middleware(DesktopSessionMiddleware)
     app.add_middleware(
         CORSMiddleware,

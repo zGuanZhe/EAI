@@ -14,6 +14,7 @@ from app.research.enrichment import KnowledgeEnrichmentService
 from app.research.store import ResearchStore
 from app.core.errors import SchemaReadOnlyError
 from app.services.projection import ProjectionService
+from app.services.container import AppServices
 from app.research.normalization import normalize_with_map
 from app.research.page_preview import PagePreviewService
 
@@ -80,6 +81,25 @@ class ResearchStoreTest(unittest.TestCase):
             read_only.close()
 
             self.assertEqual(database.read_bytes(), before)
+
+    def test_app_services_rebuilds_store_when_data_root_changes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            atlas = root / "atlas"
+            atlas.mkdir()
+            services = AppServices()
+            first = services.research_store(root / "first" / "research", atlas, root / "first" / "personal")
+            first.save_record("thread", "thread-first", {"id": "thread-first", "title": "First"})
+            first_database = first.db_path
+
+            second = services.research_store(root / "second" / "research", atlas, root / "second" / "personal")
+            self.assertIsNot(first, second)
+            self.assertIsNone(second.get_record("thread", "thread-first"))
+            services.close()
+
+            connection = sqlite3.connect(first_database)
+            self.assertEqual(connection.execute("SELECT COUNT(*) FROM research_records").fetchone()[0], 1)
+            connection.close()
 
     def test_projection_outbox_commits_canonical_state_and_replays_idempotently(self):
         with tempfile.TemporaryDirectory() as tmp:

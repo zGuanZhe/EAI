@@ -17,6 +17,7 @@ ROUTE_ALLOWLIST = {
     "research/router.py",
     "routers/system.py",
     "routers/drafts.py",
+    "routers/workspace.py",
 }
 DIRECT_REPOSITORY_ROUTER_ALLOWLIST = {"research/router.py"}
 
@@ -104,10 +105,19 @@ for path in sorted(APP.rglob("*.py")):
                 if value is not None and mutable_literal(value) and not name.isupper() and not name.startswith("__"):
                     FAILURES.append(f"{rel}:{node.lineno}: mutable module state '{name}' must live in application services")
 
-if application_route_count > 65:
+if application_route_count > 55:
     FAILURES.append(
-        f"application.py: route count grew from the frozen baseline of 65 to {application_route_count}"
+        f"application.py: route count grew from the Workspace extraction baseline of 55 to {application_route_count}"
     )
+
+application_source = (APP / "application.py").read_text(encoding="utf-8")
+for forbidden_global in ("AGENT_V2_RUNTIME", "RESEARCH_STORE", "KNOWLEDGE_ENRICHMENT", "CAMPAIGN_SERVICE"):
+    if forbidden_global in application_source:
+        FAILURES.append(f"application.py: mutable service global {forbidden_global} must remain in AppServices")
+if "@app.on_event" in application_source:
+    FAILURES.append("application.py: startup and shutdown must use FastAPI lifespan")
+if "create_app(lifespan=app_lifespan)" not in application_source:
+    FAILURES.append("application.py: AppServices must be owned by the ASGI lifespan")
 
 if FAILURES:
     print("\n".join(FAILURES), file=sys.stderr)

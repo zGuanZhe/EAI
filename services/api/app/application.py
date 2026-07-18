@@ -8,6 +8,7 @@ import urllib.error
 import urllib.request
 import uuid
 from datetime import datetime, timezone
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Callable, Iterator
 
@@ -58,9 +59,12 @@ from .core.storage import atomic_write_json_file, backup_file, read_json_file
 from .factory import create_app
 from .routers.system import create_system_router
 from .routers.drafts import create_draft_router
+from .routers.workspace import create_workspace_router
 from .repositories.personal import safe_document_path, safe_object_memory_path
 from .services.projection import ProjectionService
 from .services.drafts import ThreadDraftService
+from .services.container import AppServices
+from .services.workspace import WorkspaceService
 from .research.context import build_research_state, evidence_bundle_to_sources, search_for_agent
 from .research.documents import import_document as import_research_document
 from .research.enrichment import KnowledgeEnrichmentService
@@ -82,11 +86,8 @@ OBJECTS_DIR = RUNTIME_PATHS.objects_dir
 ATLAS_UPDATES_DIR = RUNTIME_PATHS.atlas_updates_dir
 LAB_RUNS_DIR = RUNTIME_PATHS.lab_runs_dir
 RUNTIME_V2_DIR = PERSONAL_DIR.parent / "runtime"
-AGENT_V2_RUNTIME: AgentRuntimeV2 | None = None
 AGENT_V2_THREAD_LOCK = threading.RLock()
-RESEARCH_STORE: ResearchStore | None = None
-KNOWLEDGE_ENRICHMENT: KnowledgeEnrichmentService | None = None
-CAMPAIGN_SERVICE: CampaignService | None = None
+APP_SERVICES = AppServices()
 
 SECRET_CANDIDATES = secret_candidates()
 
@@ -106,29 +107,36 @@ def ensure_dirs() -> None:
 
 
 def get_research_store() -> ResearchStore:
-    global RESEARCH_STORE, KNOWLEDGE_ENRICHMENT
     expected_dir = (PERSONAL_DIR.parent / "research").resolve()
-    if RESEARCH_STORE is not None and (
-        RESEARCH_STORE.research_dir != expected_dir
-        or RESEARCH_STORE.atlas_dir != WEB_DATA_DIR.resolve()
-        or RESEARCH_STORE.personal_dir != PERSONAL_DIR.resolve()
-    ):
-        RESEARCH_STORE.close()
-        RESEARCH_STORE = None
-        KNOWLEDGE_ENRICHMENT = None
-    if RESEARCH_STORE is None:
-        RESEARCH_STORE = ResearchStore(expected_dir, WEB_DATA_DIR, PERSONAL_DIR)
-    return RESEARCH_STORE
+    return APP_SERVICES.research_store(expected_dir, WEB_DATA_DIR, PERSONAL_DIR)
 
 
 def get_knowledge_enrichment() -> KnowledgeEnrichmentService:
-    global KNOWLEDGE_ENRICHMENT
     store = get_research_store()
-    if KNOWLEDGE_ENRICHMENT is None or KNOWLEDGE_ENRICHMENT.store is not store:
-        KNOWLEDGE_ENRICHMENT = KnowledgeEnrichmentService(store)
-        if os.environ.get("EAI_DESKTOP_MODE") == "1" and os.environ.get("EAI_DISABLE_AUTO_KNOWLEDGE_SYNC") != "1":
-            KNOWLEDGE_ENRICHMENT.ensure_initial_metadata_sync()
-    return KNOWLEDGE_ENRICHMENT
+    return APP_SERVICES.enrichment(
+        store,
+        start_initial_sync=(
+            os.environ.get("EAI_DESKTOP_MODE") == "1"
+            and os.environ.get("EAI_DISABLE_AUTO_KNOWLEDGE_SYNC") != "1"
+        ),
+    )
+
+
+def reset_app_services() -> None:
+    APP_SERVICES.close()
+
+
+def reset_agent_services() -> None:
+    APP_SERVICES.reset_runtime()
+
+
+def get_workspace_service() -> WorkspaceService:
+    return WorkspaceService(
+        get_research_store(),
+        projects_dir=PROJECTS_DIR,
+        threads_dir=THREADS_DIR,
+        backups_dir=BACKUPS_DIR,
+    )
 
 
 def read_json(path: Path) -> Any:
@@ -265,7 +273,20 @@ from .schemas.models import (
     AtlasCandidateUpdate,
 )
 
-app = create_app()
+@asynccontextmanager
+async def app_lifespan(_app):
+    ensure_dirs()
+    if not get_research_store().read_only:
+        APP_SERVICES.projection(get_research_store()).replay(limit=500)
+        get_agent_v2_runtime()
+        get_campaign_service().mark_incomplete_interrupted()
+    try:
+        yield
+    finally:
+        reset_app_services()
+
+
+app = create_app(lifespan=app_lifespan)
 app.include_router(
     create_system_router(
         service_version=SERVICE_VERSION,
@@ -277,61 +298,33 @@ app.include_router(
     )
 )
 app.include_router(create_draft_router(lambda: ThreadDraftService(get_research_store())))
-
-
-@app.on_event("startup")
-def on_startup() -> None:
-    ensure_dirs()
-    if get_research_store().read_only:
-        return
-    ProjectionService(get_research_store(), PERSONAL_DIR).replay(limit=500)
-    get_agent_v2_runtime()
-    get_campaign_service().mark_incomplete_interrupted()
-
-
-@app.on_event("shutdown")
-def on_shutdown() -> None:
-    global AGENT_V2_RUNTIME, CAMPAIGN_SERVICE
-    CAMPAIGN_SERVICE = None
-    if AGENT_V2_RUNTIME is not None:
-        AGENT_V2_RUNTIME.close()
-        AGENT_V2_RUNTIME = None
+app.include_router(create_workspace_router(get_workspace_service))
 
 
 def load_thread(thread_id: str) -> ThreadDoc:
-    data = get_research_store().get_record("thread", thread_id)
-    if data is None:
-        data = read_json(safe_thread_path(thread_id))
-        get_research_store().save_record("thread", thread_id, data)
-    return ThreadDoc.model_validate(data)
+    try:
+        return get_workspace_service().load_thread(thread_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="thread not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 def write_thread(doc: ThreadDoc, backup: bool = True) -> ThreadDoc:
-    get_research_store().ensure_writable()
-    doc = ThreadDoc.model_validate(doc.model_dump(mode="json") if isinstance(doc, ThreadDoc) else doc)
-    path = safe_thread_path(doc.id)
-    if backup:
-        backup_thread_file(path)
-    doc.revision += 1
-    doc.updated_at = utc_now()
-    save_projected_record("thread", doc.id, doc.model_dump(mode="json"), path)
-    return doc
+    return get_workspace_service().write_thread(doc, backup=backup)
 
 
 def load_project(project_id: str) -> ProjectDoc:
-    data = get_research_store().get_record("project", project_id)
-    if data is None:
-        data = read_json(safe_project_path(project_id))
-        get_research_store().save_record("project", project_id, data)
-    return ProjectDoc.model_validate(data)
+    try:
+        return get_workspace_service().load_project(project_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="project not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 def write_project(doc: ProjectDoc) -> ProjectDoc:
-    get_research_store().ensure_writable()
-    doc = ProjectDoc.model_validate(doc.model_dump(mode="json") if isinstance(doc, ProjectDoc) else doc)
-    doc.updated_at = utc_now()
-    save_projected_record("project", doc.id, doc.model_dump(mode="json"), safe_project_path(doc.id))
-    return doc
+    return get_workspace_service().write_project(doc)
 
 
 def load_object_memory(atlas_id: str, object_type: str, object_id: str) -> ObjectMemory | None:
@@ -705,21 +698,6 @@ def build_atlas_update_task_pack(atlas_id: str, payload: AtlasUpdateTaskPackRequ
     return AtlasUpdateTaskPackResponse(run=run, markdown=markdown, token_estimate=run.token_estimate)
 
 
-def thread_summary(doc: ThreadDoc) -> dict[str, Any]:
-    return {
-        "id": doc.id,
-        "project_id": doc.project_id,
-        "title": doc.title,
-        "goal": doc.goal,
-        "status": doc.status,
-        "updated_at": doc.updated_at,
-        "active_surface": doc.active_surface,
-        "active_atlas_id": doc.active_atlas_id,
-        "context_count": len(doc.context_cards),
-        "result_count": len(doc.result_cards),
-    }
-
-
 @app.get("/api/vnext/atlases")
 def list_atlases() -> list[dict[str, Any]]:
     index_path = WEB_DATA_DIR / "atlases.index.json"
@@ -753,62 +731,6 @@ def get_atlas_bundle(atlas_id: str) -> dict[str, Any]:
     for relation in data.get("relations") or []:
         relation.update(evidence_index["relations"].get(str(relation.get("id")), {}))
     return data
-
-
-@app.get("/api/vnext/projects")
-def list_projects() -> list[dict[str, Any]]:
-    ensure_dirs()
-    docs = [ProjectDoc.model_validate(item).model_dump(mode="json") for item in get_research_store().list_records("project")]
-    return sorted(docs, key=lambda x: x["updated_at"], reverse=True)
-
-
-@app.post("/api/vnext/projects", response_model=ProjectDoc)
-def create_project(payload: ProjectCreate) -> ProjectDoc:
-    now = utc_now()
-    project = ProjectDoc(
-        id=slug_id("project"),
-        title=payload.title.strip() or "Untitled outcome",
-        goal=payload.goal,
-        default_atlas_id=payload.default_atlas_id,
-        created_at=now,
-        updated_at=now,
-    )
-    return write_project(project)
-
-
-@app.get("/api/vnext/projects/{project_id}", response_model=ProjectDoc)
-def get_project(project_id: str) -> ProjectDoc:
-    return load_project(project_id)
-
-
-@app.put("/api/vnext/projects/{project_id}", response_model=ProjectDoc)
-def update_project(project_id: str, payload: ProjectUpdate) -> ProjectDoc:
-    doc = load_project(project_id)
-    raw = doc.model_dump(mode="json")
-    raw.update(payload.model_dump(exclude_unset=True, mode="json"))
-    raw["id"] = project_id
-    return write_project(ProjectDoc.model_validate(raw))
-
-
-@app.delete("/api/vnext/projects/{project_id}")
-def delete_project(project_id: str) -> dict[str, Any]:
-    path = safe_project_path(project_id)
-    if not path.exists() and get_research_store().get_record("project", project_id) is None:
-        raise HTTPException(status_code=404, detail="project not found")
-    if path.exists():
-        backup_deleted_file(path, "project")
-    delete_projected_record("project", project_id, path)
-    reassigned = 0
-    for raw in get_research_store().list_records("thread"):
-        try:
-            doc = ThreadDoc.model_validate(raw)
-        except Exception:
-            continue
-        if doc.project_id == project_id:
-            doc.project_id = None
-            write_thread(doc)
-            reassigned += 1
-    return {"deleted": project_id, "reassigned_threads": reassigned}
 
 
 def bundle_memory_items(atlas_id: str) -> list[ObjectMemory]:
@@ -1039,81 +961,6 @@ def chat_with_paper(atlas_id: str, paper_id: str, payload: PaperChatRequest) -> 
         memory.title_snapshot = str((payload.paper_context or {}).get("title") or paper_id)
     apply_paper_reading_payload(memory, parse_paper_reading_payload(raw_text))
     return write_object_memory(atlas_id, "paper", paper_id, memory)
-
-
-@app.get("/api/vnext/threads")
-def list_threads() -> list[dict[str, Any]]:
-    ensure_dirs()
-    docs = [thread_summary(ThreadDoc.model_validate(item)) for item in get_research_store().list_records("thread")]
-    return sorted(docs, key=lambda x: x["updated_at"], reverse=True)
-
-
-@app.post("/api/vnext/threads", response_model=ThreadDoc)
-def create_thread(payload: ThreadCreate) -> ThreadDoc:
-    now = utc_now()
-    title = payload.title.strip() or "Untitled research thread"
-    thread = ThreadDoc(
-        id=slug_id("thread"),
-        project_id=payload.project_id,
-        title=title,
-        goal=payload.goal,
-        created_at=now,
-        updated_at=now,
-        active_atlas_id=payload.active_atlas_id,
-        canvas=CanvasState(
-            nodes=[
-                CanvasNode(
-                    id=slug_id("q"),
-                    type="question",
-                    title=title,
-                    body=payload.goal,
-                    x=120,
-                    y=120,
-                )
-            ]
-        ),
-        messages=[
-            Message(
-                id=slug_id("msg"),
-                role="system",
-                kind="state",
-                content=f"已创建研究问题：{title}",
-                created_at=now,
-                surface="thread",
-                refs={"active_atlas_id": payload.active_atlas_id},
-            )
-        ],
-    )
-    return write_thread(thread, backup=False)
-
-
-@app.get("/api/vnext/threads/{thread_id}", response_model=ThreadDoc)
-def get_thread(thread_id: str) -> ThreadDoc:
-    return load_thread(thread_id)
-
-
-@app.put("/api/vnext/threads/{thread_id}", response_model=ThreadDoc)
-def update_thread(thread_id: str, payload: ThreadUpdate) -> ThreadDoc:
-    doc = load_thread(thread_id)
-    if payload.expected_revision is not None and payload.expected_revision != doc.revision:
-        raise HTTPException(status_code=409, detail={"message": "线程已被其他操作更新", "current_revision": doc.revision})
-    raw = doc.model_dump(mode="json")
-    changes = payload.model_dump(exclude_unset=True, mode="json")
-    changes.pop("expected_revision", None)
-    raw.update(changes)
-    doc = ThreadDoc.model_validate(raw)
-    return write_thread(doc)
-
-
-@app.delete("/api/vnext/threads/{thread_id}")
-def delete_thread(thread_id: str) -> dict[str, str]:
-    path = safe_thread_path(thread_id)
-    if not path.exists() and get_research_store().get_record("thread", thread_id) is None:
-        raise HTTPException(status_code=404, detail="thread not found")
-    if path.exists():
-        backup_deleted_file(path, "thread")
-    delete_projected_record("thread", thread_id, path)
-    return {"deleted": thread_id}
 
 
 def safe_run_text(value: Any, limit: int = 240) -> str:
@@ -4953,7 +4800,7 @@ def v2_load_full_context(thread_id: str, request: AgentV2TurnRequest) -> dict[st
         except HTTPException:
             project = {"id": doc.project_id, "missing": True}
     campaign_summaries = []
-    runtime = AGENT_V2_RUNTIME
+    runtime = APP_SERVICES.agent_runtime_if_created
     if runtime:
         for snapshot in runtime.store.list_campaign_checkpoints(thread_id)[:6]:
             campaign = snapshot.get("campaign") if isinstance(snapshot, dict) else {}
@@ -5031,7 +4878,7 @@ def v2_load_context(thread_id: str, request: AgentV2TurnRequest) -> dict[str, An
         except HTTPException:
             project = {"id": doc.project_id, "missing": True}
     campaign_summaries = []
-    runtime = AGENT_V2_RUNTIME
+    runtime = APP_SERVICES.agent_runtime_if_created
     if runtime:
         for snapshot in runtime.store.list_campaign_checkpoints(thread_id)[:4]:
             campaign = snapshot.get("campaign") if isinstance(snapshot, dict) else {}
@@ -5582,16 +5429,16 @@ def v2_undo_operation_batch(batch: AgentV2OperationBatch) -> dict[str, Any]:
 
 
 def get_agent_v2_runtime() -> AgentRuntimeV2:
-    global AGENT_V2_RUNTIME
-    if AGENT_V2_RUNTIME is None:
-        research_store = get_research_store()
+    research_store = get_research_store()
+
+    def create_runtime() -> AgentRuntimeV2:
         store = RuntimeStore(
             RUNTIME_V2_DIR,
             read_only=research_store.read_only,
             database_schema=research_store.schema_version,
             supported_schema=research_store.compatibility_status()["supported_schema_version"],
         )
-        AGENT_V2_RUNTIME = AgentRuntimeV2(
+        return AgentRuntimeV2(
             store,
             RuntimeDependencies(
                 load_context=v2_load_context,
@@ -5609,21 +5456,23 @@ def get_agent_v2_runtime() -> AgentRuntimeV2:
                 apply_operation_batch=v2_apply_operation_batch,
             ),
         )
-    return AGENT_V2_RUNTIME
+
+    return APP_SERVICES.agent_runtime(RUNTIME_V2_DIR, research_store, create_runtime)
 
 
 def get_campaign_service() -> CampaignService:
-    global CAMPAIGN_SERVICE
     runtime = get_agent_v2_runtime()
-    if CAMPAIGN_SERVICE is None or CAMPAIGN_SERVICE.runtime_store is not runtime.store:
-        CAMPAIGN_SERVICE = CampaignService(
+
+    def create_campaign() -> CampaignService:
+        return CampaignService(
             research_store=get_research_store(), runtime_store=runtime.store,
             load_thread=load_thread, prepare_operation_batch=v2_prepare_operation_batch,
             apply_operation_batch=v2_apply_operation_batch,
             planner=lambda prompt: campaign_plan_model(prompt) or "",
             read_only=runtime.store.read_only,
         )
-    return CAMPAIGN_SERVICE
+
+    return APP_SERVICES.campaign(runtime, create_campaign)
 
 
 @app.post("/api/vnext/threads/{thread_id}/agent-v2/turns", response_model=AgentV2TurnResponse)

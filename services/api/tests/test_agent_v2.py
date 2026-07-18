@@ -43,9 +43,7 @@ class AgentRuntimeV2Test(unittest.TestCase):
             "RUNTIME_V2_DIR": main.RUNTIME_V2_DIR,
             "SECRET_CANDIDATES": main.SECRET_CANDIDATES,
         }
-        if main.AGENT_V2_RUNTIME is not None:
-            main.AGENT_V2_RUNTIME.close()
-            main.AGENT_V2_RUNTIME = None
+        main.reset_app_services()
         personal = root / "personal"
         main.PERSONAL_DIR = personal
         main.THREADS_DIR = personal / "threads"
@@ -62,9 +60,7 @@ class AgentRuntimeV2Test(unittest.TestCase):
         self.client = TestClient(main.app)
 
     def tearDown(self):
-        if main.AGENT_V2_RUNTIME is not None:
-            main.AGENT_V2_RUNTIME.close()
-            main.AGENT_V2_RUNTIME = None
+        main.reset_app_services()
         for name, value in self.original.items():
             setattr(main, name, value)
         for name in ["OPENAI_API_KEY", "EAI_VNEXT_MOCK_OPENAI_RESPONSE", "EAI_V2_MOCK_ROUTE", "EAI_V2_MOCK_OPERATION_PLAN", "EAI_V2_MOCK_TOOL_DECISION"]:
@@ -639,8 +635,7 @@ class AgentRuntimeV2Test(unittest.TestCase):
         ).json()
         task = self.wait_task(started["task"]["id"], {"waiting_approval"})
         approval = self.client.get(f"/api/vnext/agent-v2/tasks/{task['id']}").json()["approvals"][0]
-        main.AGENT_V2_RUNTIME.close()
-        main.AGENT_V2_RUNTIME = None
+        main.reset_agent_services()
         restored = main.get_agent_v2_runtime().store.get_task(task["id"])
         self.assertEqual(restored.status, "waiting_approval")
         response = self.client.post(f"/api/vnext/agent-v2/approvals/{approval['id']}/resolve", json={"decision": "approve"})
