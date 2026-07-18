@@ -25,7 +25,11 @@ agent-v2 graph -> service router -> source/capability registry -> repositories
 
 模型没有直接写工具。旧回合继续读取 AgentRun v1 与 ChangeSet；新回合写入 Agent Runtime v2 task/event，并通过 OperationBatch 完成确认、冲突检查、事务写入和安全撤销。
 
-`application.py` 只承担组装与尚未抽完的兼容导出。Workspace、Draft、System、Atlas/Object Memory、Research 和 Campaign 已通过独立 router/service 边界注册。架构门禁用 AST 检查 router/service/repository 依赖方向、legacy 反向依赖、导入副作用和领域可变全局状态；文件行数只用于辅助报警。
+冻结的 `ApplicationConfig` 描述数据路径、runtime 路径、服务版本和密钥候选；`ApplicationAssembly` 按配置创建独立 FastAPI 应用，并由 lifespan 管理服务生命周期。`AppServices` 按数据根和 schema 相关签名持有 Workspace、Atlas、Provider、Change Review、Thread Content、Task Pack、Agent Domain、Agent Operations、Runtime、Campaign 与 legacy read 实例，签名变化时重建依赖实例。
+
+`application.py` 只承担默认配置、lifespan 组装、router 注册和兼容适配导出，不包含路由装饰器、Provider 协议或领域写入。Workspace、Draft、System、Atlas/Object Memory、Thread Content、Change Review、Task Pack、Research、Campaign、Agent v2 和 Legacy Read 均通过独立 router/service 边界注册。架构门禁用 AST 检查 router/service/repository 依赖方向、legacy 反向依赖、导入副作用和领域可变全局状态；文件行数只用于辅助报警。
+
+ChangeSet 与 OperationBatch 共用 Research Store 的 canonical batch executor。执行器先校验所有 expected payload，再在一个 SQLite transaction 中写入全部权威记录和对应 `projection_journal`；任一预检或写入失败时 SQLite 零写入。提交后 projector 独立重放 JSON，投影失败只保留 pending/failed journal，不撤销权威提交。若 OperationBatch 在 research commit 后、runtime receipt 前中断，重试通过线程中的 canonical `operation_batch_id` marker 对账，禁止重复应用；`research.db`、`runtime.db` 与 JSON 之间不宣称原子事务。
 
 ## Agent Runtime v2.1
 
@@ -76,10 +80,10 @@ intake -> route -> context_seed -> decide
 - Context、项目、线程、对象记忆、候选、Canvas 与 Lab 写入需要普通确认。
 - 每条 Docker 命令逐次确认，并显示命令、网络、挂载、资源和超时；Docker 不可用时只保留预览，绝不回退到宿主机执行。
 - 正式 Atlas、旧 bundle、旧 SQLite、密钥内容和任意宿主路径始终不可写或不可读。
-- OperationBatch 应用前校验 thread revision 与真实 before 值；多文件写入使用事务日志和快照。撤销前校验目标仍等于实际 after 值，冲突时零写入。
+- OperationBatch 应用前校验 thread revision 与真实 before 值；全部 canonical 目标和 projection journal 在同一 Research Store SQLite transaction 中提交。撤销前校验目标仍等于实际 after 值，冲突时 SQLite 零写入；JSON 投影始终在提交后独立重放。
 
 ## Canvas 与实验结果
 
 Canvas 文件继续保存兼容的 `nodes`、`edges`、`x` 和 `y`。前端通过纯函数遍历关系图，派生竖向论证主链；旧 `material/conclusion` 分别投影为 `evidence/decision`。Campaign 分支不复制进线程 JSON，只有用户确认晋升的 finding、task 和 campaign reference 写回 Canvas。
 
-实验结果预览返回稳定的 `apply_items`。确认接口可接收 `selected_item_ids`，只把所选阶段、产物、发现和任务写入 LabRun、ResultCard 与 Canvas；省略该字段时保持旧客户端的全量确认行为。LabRun 与 Thread 使用同一事务日志和文件快照，任一写入失败时同时回滚。
+实验结果预览返回稳定的 `apply_items`。确认接口可接收 `selected_item_ids`，只把所选阶段、产物、发现和任务写入兼容结果记录与 Canvas；省略该字段时保持旧客户端的全量确认行为。新 LabRun 不再创建；历史 LabRun 只读并可幂等迁移为 archived manual Campaign。

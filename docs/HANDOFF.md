@@ -25,7 +25,11 @@ The active workspace is `D:\Test\GUAN\EAI`. The former `EAI-Desktop` repository 
 - Desktop AppData can be overridden only in explicit test mode, enabling isolated install smoke without touching real user data.
 - Workspace server state now uses React Query keys; thread detail remains local because SSE patches it incrementally. Atlas switching, knowledge polling and runtime refresh no longer use request counters or ad hoc timers.
 - Workspace, Draft, System, Atlas/Object Memory and Agent v2/source/document APIs use explicit router/service boundaries. Agent API orchestration and its shared thread lock are lifespan-owned. Architecture checks validate dependency direction and registered routers rather than treating file size as the primary metric.
-- Legacy Agent event replay buffers and cancellation markers are also AppServices-owned and cleared with the runtime; the AST gate rejects new mutable runtime containers in `application.py` outside a fixed static-configuration allowlist.
+- Change review, thread content, Task Pack and legacy read/replay APIs now use explicit router/service boundaries. Legacy Agent v1 mutations terminate at the frozen `410 Gone` router; their unreachable execution, Provider loop and Lab/Task Pack construction code has been removed.
+- Frozen `ApplicationConfig` and `ApplicationAssembly` provide isolated application factories. `application.py` contains configuration, lifespan composition, router registration and compatibility adapters only; it has no route decorators or domain implementation.
+- `AppServices` owns Workspace, Atlas, Provider, Change Review, Thread Content, Task Pack, Agent Domain, Agent Operations, Runtime, Campaign and legacy read instances. Its data-root/schema signatures rebuild dependent services without mutable path globals.
+- ChangeSet and OperationBatch canonical writes share `ResearchStore.apply_record_batch()`: all expected values are preflighted, canonical rows and projection journal entries commit in one SQLite transaction, and JSON replay happens afterward. A runtime receipt failure after the research commit is reconciled from the canonical `operation_batch_id` marker instead of applying the batch twice.
+- Legacy Agent event replay buffers and cancellation markers were removed with the dead v1 executor; the AST gate rejects new mutable runtime containers in `application.py` outside a fixed static-configuration allowlist.
 - SourcePolicy, fail-closed AnswerDraft/Evidence Guard, revisioned drafts, PDF locator normalization, page render budgets, cancellation isolation and non-blocking SSE are implemented and covered offline.
 
 ## Validation Status
@@ -35,7 +39,7 @@ Completed in the new workspace:
 - clean `npm ci` and repository-local Python bootstrap
 - UTF-8/architecture checks
 - frontend Vitest and production build
-- FastAPI suite, including Agent v2, Research Store, Campaign, synthetic legacy fixtures, transaction rollback and `410` compatibility
+- 83-test FastAPI suite, including Agent v2, Research Store, Campaign, synthetic legacy fixtures, canonical batch rollback, projection failure, runtime receipt reconciliation and `410` compatibility
 - isolated Playwright coverage at desktop, medium and narrow widths
 - previously green Campaign Docker fixture and freshly built PyInstaller sidecar smoke; the latest Docker rerun is blocked as noted below
 - Rust fmt, Clippy with warnings denied, and three desktop data-path tests
@@ -55,7 +59,6 @@ The historical installer metadata and current 0.5 release gaps are recorded in `
 
 ## Next Priorities
 
-1. Extract legacy AgentRun/ChangeSet compatibility and Task Pack/Result routers without changing frozen OpenAPI/SSE/409/410 contracts.
-2. Remove dead compatibility implementations only after their callers use services and the full gates are green.
-3. Run the schema 3 -> 4 backup/restore report and the 0.4.1 schema 4 read-only downgrade/reopen exercise.
-4. Complete sidecar, Rust, PyInstaller and NSIS release gates, then run the restricted 20-query real Provider citation audit.
+1. Run the schema 3 -> 4 backup/restore report and the packaged 0.4.1 schema 4 read-only downgrade/reopen exercise.
+2. Begin the next major upgrade from `ApplicationAssembly` and the domain service boundaries without moving domain behavior back into `application.py`.
+3. Complete sidecar, Rust, PyInstaller and NSIS release gates, then run the restricted 20-query real Provider citation audit.
