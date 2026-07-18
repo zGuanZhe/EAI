@@ -26,15 +26,7 @@ export function AtlasPaperNode({
   onToggleContext,
   routeLabel
 }) {
-  function handleKeyDown(event) {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      onOpen(event);
-    } else if (event.key === " ") {
-      event.preventDefault();
-      onSelect(event);
-    }
-  }
+  const evidenceLabel = paper.evidence_status?.full_text ? "已有全文证据" : paper.evidence_status?.verified_claims ? `${paper.evidence_status.verified_claims} 条引用定位已核验` : paper.evidence_status?.metadata ? "身份元数据已核验" : "证据待补全";
 
   return (
     <article
@@ -59,12 +51,11 @@ export function AtlasPaperNode({
         "--route": routeColor,
         "--route-bg": routeBackground
       }}
-      role="button"
-      tabIndex="0"
-      aria-label={`${paper.title}，${relationCount} 条关系`}
       onClick={onSelect}
-      onDoubleClick={onOpen}
-      onKeyDown={handleKeyDown}
+      onDoubleClick={(event) => {
+        if (!event.target.closest("button, a")) onOpen(event);
+      }}
+      aria-label={`${paper.title}，${relationCount} 条关系，${evidenceLabel}`}
     >
       <span className="paper-route-line" aria-hidden="true" />
       <span
@@ -72,9 +63,9 @@ export function AtlasPaperNode({
           "paper-evidence-dot",
           paper.evidence_status?.full_text ? "full-text" : paper.evidence_status?.verified_claims ? "claims" : paper.evidence_status?.metadata ? "metadata" : "missing"
         )}
-        title={paper.evidence_status?.full_text ? "已有全文证据" : paper.evidence_status?.verified_claims ? `${paper.evidence_status.verified_claims} 条可验证论断` : paper.evidence_status?.metadata ? "身份元数据已核验" : "证据待补全"}
-        aria-label="论文证据状态"
-      />
+        title={evidenceLabel}
+        aria-label={evidenceLabel}
+      /><span className="sr-only">{evidenceLabel}</span>
       <span className="paper-port left" aria-hidden="true" />
       <span className="paper-port right" aria-hidden="true" />
       {inPath && <span className="path-index">{pathIndex + 1}</span>}
@@ -95,7 +86,7 @@ export function AtlasPaperNode({
           <em>{Math.round((paper.confidence || 0) * 100)}%</em>
         </div>
       )}
-      <div className="paper-title">{paper.title}</div>
+      <button type="button" className="paper-title paper-title-button" onClick={onSelect} onDoubleClick={(event) => { event.stopPropagation(); onOpen(event); }}>{paper.title}</button>
       <div className="paper-meta">{paper.year || "----"} · {paper.venue || "未知来源"}</div>
       <p className="paper-summary">{paper.summary || paper.why || paper.local_role || paper.why_included || "尚无摘要"}</p>
       <div className="paper-foot">

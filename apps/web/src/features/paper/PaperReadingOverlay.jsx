@@ -38,6 +38,11 @@ export function PaperReadingOverlay({
     [knowledge.evidence]
   );
   const routeName = detail?.route?.title_cn || detail?.route?.title || detail?.route?.label || paper?.route_id || "未定路线";
+  const dirty = JSON.stringify(draft) !== JSON.stringify(savedDraft);
+  const closeReader = () => {
+    if (dirty && !window.confirm("当前论文笔记尚未保存，确认关闭吗？")) return;
+    onClose?.();
+  };
 
   useEffect(() => {
     const next = initialDraft(detail?.memory);
@@ -48,10 +53,10 @@ export function PaperReadingOverlay({
 
   useEffect(() => {
     if (!detail) return undefined;
-    const onKey = (event) => event.key === "Escape" && onClose?.();
+    const onKey = (event) => event.key === "Escape" && closeReader();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [detail, onClose]);
+  }, [detail, dirty, onClose]);
 
   const memoryPayload = useMemo(() => ({
     object_ref: { atlas_id: detail?.atlas?.id, object_type: "paper", object_id: paper?.id },
@@ -88,13 +93,13 @@ export function PaperReadingOverlay({
   const askPrompt = `请围绕《${paper.title}》整理核心创新、核心技术、关键证据、局限与可复用启发。对缺少原文支撑的内容明确标注“需要原文确认”，并将建议修改生成可确认变更集。`;
 
   return (
-    <div className="paper-reader-layer">
+    <div className="paper-reader-layer" role="dialog" aria-modal="true" aria-labelledby="paper-reader-title">
       <article className="paper-reader" style={{ "--route": detail.routeColor || "#2563eb" }}>
         <header className="paper-reader-header">
-          <button type="button" className="paper-reader-back" onClick={onClose}><ArrowLeft size={16} />收起</button>
+          <button type="button" className="paper-reader-back" onClick={closeReader}><ArrowLeft size={16} />收起</button>
           <div>
             <span>Atlas {detail.atlas?.id || "-"} · {routeName}</span>
-            <h1>{paper.title}</h1>
+            <h1 id="paper-reader-title">{paper.title}</h1>
             <p>{paper.year || "未知年份"} · {paper.venue || "未知来源"}</p>
           </div>
           <div className="paper-reader-actions">

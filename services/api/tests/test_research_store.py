@@ -5,12 +5,17 @@ import sqlite3
 import tempfile
 import unittest
 import time
+import fitz
 from pathlib import Path
+from unittest.mock import patch
 
 from app.research.documents import import_document
 from app.research.enrichment import KnowledgeEnrichmentService
 from app.research.store import ResearchStore
 from app.core.errors import SchemaReadOnlyError
+from app.services.projection import ProjectionService
+from app.research.normalization import normalize_with_map
+from app.research.page_preview import PagePreviewService
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -53,7 +58,7 @@ class ResearchStoreTest(unittest.TestCase):
             database = research_dir / "research.db"
             connection = sqlite3.connect(database)
             connection.execute(
-                "INSERT INTO schema_migrations(version, applied_at, summary) VALUES(4, 'future', 'future schema')"
+                "INSERT INTO schema_migrations(version, applied_at, summary) VALUES(5, 'future', 'future schema')"
             )
             connection.commit()
             connection.close()
@@ -63,8 +68,8 @@ class ResearchStoreTest(unittest.TestCase):
             self.assertEqual(
                 read_only.compatibility_status(),
                 {
-                    "schema_version": 4,
-                    "supported_schema_version": 3,
+                    "schema_version": 5,
+                    "supported_schema_version": 4,
                     "read_only": True,
                     "reason": "schema_newer_than_app",
                 },
@@ -75,6 +80,107 @@ class ResearchStoreTest(unittest.TestCase):
             read_only.close()
 
             self.assertEqual(database.read_bytes(), before)
+
+    def test_projection_outbox_commits_canonical_state_and_replays_idempotently(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            personal = root / "personal"
+            store = ResearchStore(root / "research", ATLAS_DIR, personal)
+            projector = ProjectionService(store, personal)
+            payload = {"id": "thread-outbox", "title": "Canonical", "revision": 1}
+            store.save_record("thread", "thread-outbox", payload, projection_target="threads/thread-outbox.json")
+
+            with patch("app.services.projection.atomic_write_json_file", side_effect=OSError("disk unavailable")):
+                failed = projector.replay(entity_kind="thread", entity_id="thread-outbox")
+            self.assertEqual(failed["failed"], 1)
+            self.assertEqual(store.get_record("thread", "thread-outbox")["title"], "Canonical")
+            self.assertFalse((personal / "threads" / "thread-outbox.json").exists())
+            self.assertEqual(store.projection_status()["failed"], 1)
+
+            replayed = projector.replay(entity_kind="thread", entity_id="thread-outbox")
+            self.assertEqual(replayed["applied"], 1)
+            self.assertEqual(
+                json.loads((personal / "threads" / "thread-outbox.json").read_text(encoding="utf-8"))["title"],
+                "Canonical",
+            )
+            self.assertEqual(store.projection_status()["applied"], 1)
+
+            updated = {**payload, "title": "Newer", "revision": 2}
+            store.save_record("thread", "thread-outbox", updated, projection_target="threads/thread-outbox.json")
+            store.save_record("thread", "thread-outbox", updated, projection_target="threads/thread-outbox.json")
+            jobs = store.list_projection_jobs(entity_kind="thread", entity_id="thread-outbox")
+            self.assertEqual(len(jobs), 1)
+            projector.replay(entity_kind="thread", entity_id="thread-outbox")
+            self.assertEqual(
+                json.loads((personal / "threads" / "thread-outbox.json").read_text(encoding="utf-8"))["title"],
+                "Newer",
+            )
+
+            store.delete_record("thread", "thread-outbox", projection_target="threads/thread-outbox.json")
+            projector.replay(entity_kind="thread", entity_id="thread-outbox")
+            self.assertFalse((personal / "threads" / "thread-outbox.json").exists())
+
+            recreated = {**payload, "title": "Recreated", "revision": 1}
+            store.save_record("thread", "thread-outbox", recreated, projection_target="threads/thread-outbox.json")
+            projector.replay(entity_kind="thread", entity_id="thread-outbox")
+            self.assertEqual(
+                json.loads((personal / "threads" / "thread-outbox.json").read_text(encoding="utf-8"))["title"],
+                "Recreated",
+            )
+            store.close()
+
+    def test_projection_replay_never_applies_failed_old_revision_after_newer_commit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            personal = root / "personal"
+            store = ResearchStore(root / "research", ATLAS_DIR, personal)
+            projector = ProjectionService(store, personal)
+            target = "threads/out-of-order.json"
+            store.save_record("thread", "out-of-order", {"id": "out-of-order", "title": "Old"}, projection_target=target)
+            with patch("app.services.projection.atomic_write_json_file", side_effect=OSError("disk unavailable")):
+                projector.replay(entity_kind="thread", entity_id="out-of-order")
+            store.save_record("thread", "out-of-order", {"id": "out-of-order", "title": "New"}, projection_target=target)
+            result = projector.replay(entity_kind="thread", entity_id="out-of-order")
+            self.assertEqual(result["superseded"], 1)
+            self.assertEqual(json.loads((personal / target).read_text(encoding="utf-8"))["title"], "New")
+            store.close()
+
+    def test_pdf_locator_normalizes_text_and_enforces_render_limits(self):
+        normalized, mapping = normalize_with_map("Ａgent\u00ad work-\nflow 证 据")
+        self.assertEqual(normalized, "agent workflow 证据")
+        self.assertTrue(mapping)
+
+        pdf = fitz.open()
+        page = pdf.new_page(width=612, height=792)
+        quote = "Evidence locator verifies this exact quote."
+        page.insert_text((72, 100), quote)
+        payload = pdf.tobytes()
+        pdf.close()
+
+        work = self.store.search("QT-Opt", atlas_ids=["I"], limit=1).works[0]
+        document = import_document(
+            self.store, file_name="locator.pdf", media_type="application/pdf", content=payload,
+            work_id=work.id, source_kind="user", access="local", evictable=False,
+        )
+        chunk = self.store.search_document_chunks("Evidence locator", limit=1)[0]
+        claim = self.store.save_claim_with_evidence(
+            work_id=work.id, predicate="has_locator", text="Evidence has an original page locator.",
+            chunk_id=chunk["chunk_id"], quote=quote,
+        )
+        evidence_id = claim.evidence_ids[0]
+        preview = PagePreviewService(self.store)
+        locator = preview.locator(evidence_id)
+        self.assertEqual(locator["status"], "verified")
+        self.assertEqual(locator["page"], 1)
+        self.assertTrue(locator["rects"])
+        image, _ = preview.render(document["id"], 1, 144)
+        self.assertTrue(image.startswith(b"\x89PNG"))
+        with self.assertRaisesRegex(ValueError, "DPI"):
+            preview.render(document["id"], 1, 181)
+        with self.assertRaisesRegex(ValueError, "outside"):
+            preview.render(document["id"], 2, 144)
+        with self.assertRaises(FileNotFoundError):
+            preview._document_path({**document, "blob_path": str(Path(self.temp.name) / "escape.pdf")})
 
     def test_identity_resolution_and_graph_neighborhood(self):
         work = next(item for item in self.store.works_for_sync() if item["identifiers"].get("arxiv"))

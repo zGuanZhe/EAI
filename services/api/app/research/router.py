@@ -5,7 +5,7 @@ import time
 from collections.abc import Callable, Iterator
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 
 from .documents import import_document
 from .enrichment import KnowledgeEnrichmentService
@@ -17,6 +17,8 @@ from .models import (
     SyncRequest,
 )
 from .store import ResearchStore
+from .page_preview import PagePreviewService
+from ..services.projection import ProjectionService
 
 
 def create_research_router(
@@ -28,6 +30,19 @@ def create_research_router(
     @router.get("/status")
     def status():
         return get_store().status()
+
+    @router.get("/projection/status")
+    def projection_status():
+        store = get_store()
+        counts = store.projection_status()
+        return {"counts": counts, "requires_rebuild": bool(counts.get("pending", 0) or counts.get("failed", 0))}
+
+    @router.post("/projection/replay")
+    def replay_projections(limit: int = Query(default=100, ge=1, le=1000)):
+        store = get_store()
+        store.ensure_writable()
+        result = ProjectionService(store, store.personal_dir).replay(limit=limit)
+        return {"result": result, "counts": store.projection_status()}
 
     @router.get("/quality")
     def quality():
@@ -61,6 +76,30 @@ def create_research_router(
             raise HTTPException(status_code=404, detail="research work not found")
         claims, evidence = store.claims_for_work(work.id, verified_only=verified_only)
         return {"work": work, "claims": claims, "evidence": evidence}
+
+    @router.get("/evidence/{evidence_id}/locator")
+    def evidence_locator(evidence_id: str):
+        try:
+            return PagePreviewService(get_store()).locator(evidence_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except (ValueError, FileNotFoundError) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @router.get("/documents/{document_id}/pages/{page_number}/image")
+    def document_page_image(document_id: str, page_number: int, dpi: int = Query(default=144, ge=72, le=180)):
+        try:
+            payload, etag = PagePreviewService(get_store()).render(document_id, page_number, dpi)
+            return Response(
+                payload, media_type="image/png",
+                headers={"ETag": etag, "Cache-Control": "private, max-age=86400"},
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except TimeoutError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except (ValueError, FileNotFoundError) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     @router.post("/graph/neighborhood")
     def graph_neighborhood(payload: GraphNeighborhoodRequest):

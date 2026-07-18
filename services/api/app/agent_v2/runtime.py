@@ -527,12 +527,12 @@ class AgentRuntimeV2:
         if decision.service != "conversation":
             self._event(task.id, "status", {"label": "正在装配必要资料", "phase": "context"})
         request = AgentTurnRequest.model_validate(state["request"])
-        seed = build_context_seed(state.get("context") or {}, request)
+        seed = build_context_seed(state.get("context") or {}, request, decision.source_policy)
         explicit: list[SourceRecord] = []
-        if decision.service != "conversation" and request.turn_attachments:
+        if decision.service != "conversation" and request.turn_attachments and decision.source_policy in {"atlas_only", "local_only", "local_and_external"}:
             atlas_id = str((seed.get("thread") or {}).get("active_atlas_id") or "G")
             explicit = self.sources.sources_from_materials(request.turn_attachments, task.id, atlas_id)
-            if "atlas_only" in decision.requested_outputs:
+            if decision.source_policy == "atlas_only":
                 explicit = [source for source in explicit if source.source_kind == "atlas"]
             if explicit:
                 self._record_sources(task, explicit)
@@ -603,6 +603,7 @@ class AgentRuntimeV2:
         request: AgentTurnRequest,
         decision: ServiceDecision,
         observations: list[dict[str, Any]],
+        context_seed: dict[str, Any] | None = None,
     ) -> ToolDecision:
         if observations or task.budget_usage.rounds > 0:
             task_sources = [source for source_id in task.source_ids if (source := self.store.get_source(source_id))]
@@ -652,8 +653,14 @@ class AgentRuntimeV2:
             if campaign_id:
                 return ToolDecision(action="call_tools", calls=[ToolCallRequest(capability="campaign.inspect", arguments={"campaign_id": campaign_id})])
             return ToolDecision(action="call_tools", calls=[ToolCallRequest(capability="campaign.prepare_idea", arguments={"objective": decision.objective, "count": 3})])
-        calls = [ToolCallRequest(capability="knowledge.search", arguments={"query": decision.objective, "limit": 18}, rationale="先检索本地策展图、全文和研究状态。")]
-        if decision.service == "document_reading":
+        if decision.source_policy == "external_only":
+            calls = [ToolCallRequest(capability="sources.search_external", arguments={"query": decision.objective, "limit": 18}, rationale="只检索外部学术来源。")]
+        elif decision.source_policy == "atlas_only":
+            atlas_id = str((((context_seed or {}).get("thread") or {}).get("active_atlas_id")) or "G")
+            calls = [ToolCallRequest(capability="atlas.search", arguments={"query": decision.objective, "atlas_id": atlas_id, "limit": 18}, rationale="只检索 Atlas 策展来源。")]
+        else:
+            calls = [ToolCallRequest(capability="knowledge.search", arguments={"query": decision.objective, "limit": 18}, rationale="先检索本地策展图、全文和研究状态。")]
+        if decision.service == "document_reading" and decision.source_policy in {"local_only", "local_and_external"}:
             calls.append(ToolCallRequest(capability="documents.search", arguments={"query": decision.objective, "limit": 10}))
         if decision.source_policy == "local_and_external":
             attachment_title = next((clean_text(item.get("title"), 500) for item in request.turn_attachments if isinstance(item, dict) and clean_text(item.get("title"), 500)), "")
@@ -682,8 +689,12 @@ class AgentRuntimeV2:
             return {"tool_decision": ToolDecision(action="answer", reason="已达到本轮预算。" ).model_dump(mode="json"), "pending_calls": []}
 
         available = capability_specs(service=decision.service)
-        if decision.source_policy != "local_and_external":
+        if decision.source_policy not in {"external_only", "local_and_external"}:
             available = [item for item in available if "network.academic" not in item.scopes]
+        if decision.source_policy == "external_only":
+            available = [item for item in available if "network.academic" in item.scopes or item.permission == "write" or "ui" in item.scopes]
+        elif decision.source_policy == "atlas_only":
+            available = [item for item in available if "atlas" in item.scopes or item.permission == "write" or "ui" in item.scopes]
         if usage.external_queries >= task.budget.max_external_queries:
             available = [item for item in available if item.id != "sources.search_external"]
         if usage.fulltext_imports >= task.budget.max_fulltext_imports:
@@ -719,7 +730,7 @@ class AgentRuntimeV2:
                 selected = self._parse_tool_decision(self.dependencies.tool_model(prompt, tools, request.model_overrides))
             except Exception as exc:
                 self._event(task.id, "status", {"label": f"能力规划器不可用，使用安全降级：{safe_provider_error(exc)}", "phase": "planning", "tone": "warning"})
-        selected = selected or self._fallback_tool_decision(task, request, decision, observations)
+        selected = selected or self._fallback_tool_decision(task, request, decision, observations, state.get("context_seed") or {})
         allowed = {item.id: item for item in available if item.available}
         calls: list[ToolCallRequest] = []
         for item in selected.calls:
@@ -753,8 +764,12 @@ class AgentRuntimeV2:
             specification = capability(item.capability)
             if not specification or not specification.available or decision.service not in specification.services:
                 raise ValueError(f"能力不允许用于当前服务：{item.capability}")
-            if decision.source_policy != "local_and_external" and "network.academic" in specification.scopes:
+            if decision.source_policy not in {"external_only", "local_and_external"} and "network.academic" in specification.scopes:
                 raise ValueError("本轮来源策略禁止外部网络能力")
+            if decision.source_policy == "external_only" and "network.academic" not in specification.scopes and specification.permission != "write" and "ui" not in specification.scopes:
+                raise ValueError("本轮来源策略禁止本地证据能力")
+            if decision.source_policy == "atlas_only" and "atlas" not in specification.scopes and specification.permission != "write" and "ui" not in specification.scopes:
+                raise ValueError("本轮来源策略只允许 Atlas 证据能力")
             now = utc_now()
             call = ToolCall(
                 id=new_id("tool_call"), task_id=task.id, attempt_id=task.active_attempt_id,
@@ -1038,21 +1053,69 @@ class AgentRuntimeV2:
             self._event(task.id, "answer_ready", {"validated": True, "citation_count": 0})
             return {"answer": state.get("answer") or state.get("raw_answer") or ""}
         sources = [source for source_id in task.source_ids if (source := self.store.get_source(source_id))]
-        guarded = guard_answer(state.get("raw_answer") or "", sources)
+        assessment = state.get("evidence_assessment") or {}
+        if assessment.get("requires_original") and not assessment.get("sufficient"):
+            answer = state.get("raw_answer") or self._insufficient_evidence_answer(sources, assessment)
+            self._event(task.id, "answer_ready", {
+                "validated": False, "guard_status": "limited", "citation_integrity": "missing",
+                "evidence_sufficiency": "limited", "citation_count": 0,
+            })
+            return {
+                "answer": answer, "citation_bindings": [], "cited_source_ids": [],
+                "guard_status": "limited", "citation_integrity": "missing",
+                "guard_evidence_sufficiency": "limited",
+            }
+        raw_answer = state.get("raw_answer") or ""
+        guarded = guard_answer(raw_answer, sources)
+        if guarded.guard_status == "invalid_draft" and raw_answer and self.dependencies.stream_model:
+            try:
+                repair_prompt = json.dumps({
+                    "task": "Repair this response into the exact AnswerDraft JSON schema. Do not add claims or sources.",
+                    "answer_schema": answer_schema_instruction(),
+                    "allowed_source_ids": [source.id for source in sources],
+                    "invalid_response": raw_answer,
+                }, ensure_ascii=False)
+                iterator, _, _ = self.dependencies.stream_model(
+                    repair_prompt, profile_for_service(decision.service),
+                    AgentTurnRequest.model_validate(state["request"]).model_overrides,
+                    lambda: self._closed or task.id in self._cancelled,
+                )
+                repaired = "".join(str(delta or "") for delta in iterator).strip()
+                self._ensure_active(task.id)
+                guarded = guard_answer(repaired, sources)
+                self._event(task.id, "status", {
+                    "label": "结构化证据协议已修复" if guarded.guard_status != "invalid_draft" else "结构化证据协议修复失败",
+                    "phase": "evidence_guard", "tone": "info" if guarded.guard_status != "invalid_draft" else "warning",
+                })
+            except Exception as exc:
+                self._ensure_active(task.id)
+                self._event(task.id, "status", {
+                    "label": f"结构化证据协议修复失败：{clean_text(exc, 120)}",
+                    "phase": "evidence_guard", "tone": "warning",
+                })
         answer = guarded.answer or self._fallback_answer(
-            AgentTurnRequest.model_validate(state["request"]), decision, sources, state.get("evidence_assessment") or {}
+            AgentTurnRequest.model_validate(state["request"]), decision, sources, assessment
         )
         for warning in guarded.warnings:
             self._event(task.id, "evidence_gap", {"message": warning})
         for index in range(0, len(answer), 80):
             self._event(task.id, "answer_delta", {"text": answer[index:index + 80]})
-        self._event(task.id, "answer_ready", {"validated": True, "citation_count": len(guarded.cited_sources)})
+        self._event(task.id, "answer_ready", {
+            "validated": guarded.guard_status == "passed",
+            "guard_status": guarded.guard_status,
+            "citation_integrity": guarded.citation_integrity,
+            "evidence_sufficiency": guarded.evidence_sufficiency,
+            "citation_count": len(guarded.cited_sources),
+        })
         request = AgentTurnRequest.model_validate(state["request"])
         memory_artifact = self._create_memory_draft(task, request, decision, answer)
         return {
             "answer": answer,
             "citation_bindings": [item.model_dump(mode="json") for item in guarded.bindings],
             "cited_source_ids": [item.id for item in guarded.cited_sources],
+            "guard_status": guarded.guard_status,
+            "citation_integrity": guarded.citation_integrity,
+            "guard_evidence_sufficiency": guarded.evidence_sufficiency,
             "artifact_ids": list(dict.fromkeys((state.get("artifact_ids") or []) + ([memory_artifact.id] if memory_artifact else []))),
         }
 
@@ -1377,7 +1440,7 @@ class AgentRuntimeV2:
         elif execution.get("status") == "applied":
             answer = f"{answer}\n\n已完成并验证你确认的操作。"
         consulted_sources = [source for source_id in task.source_ids if (source := self.store.get_source(source_id))]
-        cited_ids = state.get("cited_source_ids") or ([] if decision.service == "conversation" else task.source_ids)
+        cited_ids = state.get("cited_source_ids") if "cited_source_ids" in state else ([] if decision.service == "conversation" else task.source_ids)
         source_by_id = {source.id: source for source in consulted_sources}
         sources = [source_by_id[source_id] for source_id in cited_ids if source_id in source_by_id]
         operation_batches = self.store.list_operation_batches(task.id)
@@ -1403,13 +1466,16 @@ class AgentRuntimeV2:
             "consulted_source_ids": task.source_ids,
             "citations": citations,
             "citation_bindings": state.get("citation_bindings") or [],
+            "guard_status": state.get("guard_status") or ("not_required" if decision.service == "conversation" else "blocked"),
+            "citation_integrity": state.get("citation_integrity") or "missing",
+            "guard_evidence_sufficiency": state.get("guard_evidence_sufficiency") or "missing",
             "evidence_assessment": assessment,
             "next_actions": ([{
                 "id": "inspect-original-sources",
                 "action": "inspect_sources",
                 "label": "查看原始来源",
                 "description": "检查已找到的摘要、开放全文入口和当前证据边界。",
-            }] if assessment.get("requires_original") and not assessment.get("sufficient") and sources else []),
+            }] if assessment.get("requires_original") and not assessment.get("sufficient") and consulted_sources else []),
             "artifact_ids": task.artifact_ids,
             "approval_ids": task.approval_ids,
             "agent_v2_operation_batches": [batch.model_dump(mode="json") for batch in operation_batches],

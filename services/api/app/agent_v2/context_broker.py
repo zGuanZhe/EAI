@@ -12,9 +12,19 @@ UNTRUSTED_NOTICE = (
 )
 
 
-def build_context_seed(raw: dict[str, Any], request: AgentTurnRequest) -> dict[str, Any]:
+def build_context_seed(raw: dict[str, Any], request: AgentTurnRequest, source_policy: str = "local_and_external") -> dict[str, Any]:
     thread = raw.get("thread") or {}
-    campaign_summaries = list(raw.get("campaign_summaries") or [])[:4]
+    local_evidence_allowed = source_policy in {"atlas_only", "local_only", "local_and_external"}
+    attachments = list(request.turn_attachments or [])[:8] if local_evidence_allowed else []
+    if source_policy == "atlas_only":
+        attachments = [
+            item for item in attachments
+            if isinstance(item, dict)
+            and isinstance(item.get("source_ref"), dict)
+            and bool(item["source_ref"].get("paper_id") or item["source_ref"].get("work_id"))
+            and bool(item["source_ref"].get("atlas_id"))
+        ]
+    campaign_summaries = list(raw.get("campaign_summaries") or [])[:4] if source_policy in {"local_only", "local_and_external"} else []
     return {
         "thread": {
             "id": thread.get("id"),
@@ -27,7 +37,7 @@ def build_context_seed(raw: dict[str, Any], request: AgentTurnRequest) -> dict[s
         },
         "project": raw.get("project"),
         "recent_messages": list(raw.get("recent_messages") or [])[-8:],
-        "turn_attachments": list(request.turn_attachments or [])[:8],
+        "turn_attachments": attachments,
         "campaign_summaries": campaign_summaries,
         "trust_boundary": UNTRUSTED_NOTICE,
     }

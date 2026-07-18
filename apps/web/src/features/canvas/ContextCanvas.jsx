@@ -124,7 +124,7 @@ export function ContextCanvas({ thread, onDetail, onSave, onAskAgent, onThreadCh
               <Button variant="secondary" onClick={() => setAddOpen((value) => !value)}><Plus size={14} />添加节点</Button>
               {addOpen && <div>{NODE_TYPES.map((type) => <button type="button" key={type} onClick={() => createNode(type)}>{NODE_LABELS[type]}</button>)}</div>}
             </div>}
-            {view === "argument" && <Button variant="primary" disabled={!readiness.ready} onClick={onAskAgent}><Sparkles size={14} />Agent 检查</Button>}
+            {view === "argument" && <Button variant="primary" onClick={() => onAskAgent?.(readiness.ready ? "请检查当前 Context Canvas 的论证结构、证据支撑和下一步。" : "请帮助我搭建当前 Context Canvas：先澄清研究问题，再建议需要的证据、候选假设和一个可执行的下一步。") }><Sparkles size={14} />Agent 检查</Button>}
           </>
         )}
       />

@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { NotificationProvider } from "./Notifications.jsx";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -8,5 +9,5 @@ const queryClient = new QueryClient({
 });
 
 export function AppProviders({ children }) {
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return <QueryClientProvider client={queryClient}><NotificationProvider>{children}</NotificationProvider></QueryClientProvider>;
 }

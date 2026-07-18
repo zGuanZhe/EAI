@@ -15,7 +15,7 @@ ServiceType = Literal[
     "research_campaign",
 ]
 IntentOverride = Literal["auto", "chat", "local", "deep_research", "execute"]
-SourcePolicy = Literal["none", "local_only", "local_and_external"]
+SourcePolicy = Literal["none", "atlas_only", "local_only", "external_only", "local_and_external"]
 TaskStatus = Literal[
     "pending",
     "running",

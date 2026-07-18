@@ -11,3 +11,9 @@ class SchemaReadOnlyError(RuntimeError):
             "read_only": True,
         }
         super().__init__(self.detail["message"])
+
+
+class RevisionConflictError(RuntimeError):
+    def __init__(self, detail: dict):
+        self.detail = detail
+        super().__init__(str(detail.get("message") or "revision conflict"))

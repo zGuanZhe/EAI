@@ -16,6 +16,7 @@ ROUTE_ALLOWLIST = {
     "campaign/router.py",
     "research/router.py",
     "routers/system.py",
+    "routers/drafts.py",
 }
 DIRECT_REPOSITORY_ROUTER_ALLOWLIST = {"research/router.py"}
 

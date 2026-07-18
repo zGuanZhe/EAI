@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Check, Clipboard, Clock3, Copy, FileText, GitBranch, Link2, ListChecks,
   PanelRight, Pencil, Plus, Search, Send, Sparkles, SquareDashedMousePointer, X
@@ -997,17 +998,43 @@ function CanvasNodeInspector({ detail, templates, onRecommendedTemplate }) {
 }
 
 export function ConfirmDialog({ action, onCancel, onConfirm }) {
-  return (
+  const cancelRef = useRef(null);
+  const dialogRef = useRef(null);
+  const previousFocus = useRef(document.activeElement);
+  const titleId = `confirm-${action.id || "action"}-title`;
+  useEffect(() => {
+    const appRoot = document.getElementById("root");
+    if (appRoot) appRoot.inert = true;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") onCancel();
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = [...dialogRef.current.querySelectorAll("button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])")];
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    cancelRef.current?.focus();
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      if (appRoot) appRoot.inert = false;
+      previousFocus.current?.focus?.();
+    };
+  }, [onCancel]);
+  return createPortal(
     <div className="confirm-layer" role="presentation" onMouseDown={onCancel}>
-      <section className={cx("confirm-dialog", action.tone === "danger" && "danger")} role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
+      <section ref={dialogRef} className={cx("confirm-dialog", action.tone === "danger" && "danger")} role="dialog" aria-modal="true" aria-labelledby={titleId} onMouseDown={(event) => event.stopPropagation()}>
         <span>请确认</span>
-        <h2>{action.title}</h2>
+        <h2 id={titleId}>{action.title}</h2>
         <p>{action.message}</p>
         <div>
-          <button className="ghost-button soft" type="button" onClick={onCancel}>取消</button>
+          <button ref={cancelRef} className="ghost-button soft" type="button" onClick={onCancel}>取消</button>
           <button className="danger-button" type="button" onClick={onConfirm}>{action.confirmLabel || "确认"}</button>
         </div>
       </section>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -64,6 +64,7 @@ CAPABILITY_REGISTRY: dict[str, CapabilitySpec] = {
         spec("workspace.snapshot", "读取工作区摘要", "读取当前项目、线程、焦点和安全摘要。", ["conversation", *WORKSPACE], "read", object_schema(), scopes=["project", "thread"]),
         spec("context.list", "读取线程资料", "按需读取本轮附件与长期资料。", [*RESEARCH, "workspace_operation"], "read", object_schema({"limit": {"type": "integer", "minimum": 1, "maximum": 24}}), scopes=["thread.context"]),
         spec("knowledge.search", "检索研究知识库", "检索 Atlas、全文、Claim、EvidenceSpan 和研究状态。", RESEARCH, "read", object_schema({"query": STRING, "limit": {"type": "integer", "minimum": 1, "maximum": 30}}, ["query"]), scopes=["knowledge"]),
+        spec("atlas.search", "检索 Atlas", "只检索指定 Atlas 的策展论文，不读取个人资料或本地文档。", RESEARCH, "read", object_schema({"query": STRING, "atlas_id": STRING, "limit": {"type": "integer", "minimum": 1, "maximum": 30}}, ["query"]), scopes=["atlas"]),
         spec("knowledge.resolve_work", "解析论文身份", "通过 DOI、arXiv、OpenAlex 或标题解析论文。", RESEARCH, "read", object_schema({"identifier": STRING, "scheme": STRING}, ["identifier"]), scopes=["knowledge.identity"]),
         spec("knowledge.work_profile", "读取论文证据档案", "读取论文身份、Atlas 位置、论断和证据缺口。", RESEARCH, "read", object_schema({"work_id": STRING}, ["work_id"]), scopes=["knowledge.work"]),
         spec("knowledge.claim_evidence", "核验论断证据", "读取原子论断对应的页码、章节或表格定位。", RESEARCH, "read", object_schema({"claim_id": STRING}, ["claim_id"]), scopes=["knowledge.evidence"]),

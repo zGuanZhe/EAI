@@ -30,15 +30,31 @@ export function SurfaceHeader({ tone = "blue", eyebrow, title, description, acti
 
 export function Drawer({ open, title, eyebrow, tone = "blue", onClose, children, className = "", footer, overlay = false }) {
   const drawerRef = useRef(null);
+  const previousFocusRef = useRef(null);
 
   useEffect(() => {
     if (!open || !overlay) return undefined;
+    previousFocusRef.current = document.activeElement;
+    const appRoot = document.getElementById("root");
+    if (appRoot) appRoot.inert = true;
     const handleKeyDown = (event) => {
       if (event.key === "Escape") onClose?.();
+      if (event.key === "Tab" && drawerRef.current) {
+        const focusable = [...drawerRef.current.querySelectorAll("button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])")];
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }
     };
     document.addEventListener("keydown", handleKeyDown);
-    requestAnimationFrame(() => drawerRef.current?.focus());
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    requestAnimationFrame(() => drawerRef.current?.querySelector("button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])")?.focus() || drawerRef.current?.focus());
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      if (appRoot) appRoot.inert = false;
+      previousFocusRef.current?.focus?.();
+    };
   }, [open, overlay, onClose]);
 
   if (!open) return null;

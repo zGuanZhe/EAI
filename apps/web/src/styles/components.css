@@ -6,6 +6,40 @@
   transition: background var(--motion-fast) var(--ease-product), color var(--motion-fast) var(--ease-product), transform var(--motion-fast) var(--ease-product);
 }
 
+.ui-button:focus-visible,
+.ui-icon-button:focus-visible,
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.notification-region {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 80;
+  display: grid;
+  gap: 8px;
+  width: min(380px, calc(100vw - 28px));
+  pointer-events: none;
+}
+
+.notification-item {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #17202a;
+  color: #fff;
+  box-shadow: 0 3px 8px rgba(20, 30, 40, 0.2);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.notification-item.tone-error { background: #8f2430; }
+
 .ui-button {
   display: inline-flex;
   min-height: 36px;

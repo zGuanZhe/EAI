@@ -40,11 +40,11 @@ class VNextServiceTest(unittest.TestCase):
         schema = json.loads(json.dumps(main.app.openapi()))
         schema.get("info", {}).pop("version", None)
         serialized = json.dumps(schema, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-        self.assertEqual(len(schema["paths"]), 102)
-        self.assertEqual(sum(len(operations) for operations in schema["paths"].values()), 109)
+        self.assertEqual(len(schema["paths"]), 107)
+        self.assertEqual(sum(len(operations) for operations in schema["paths"].values()), 116)
         self.assertEqual(
             hashlib.sha256(serialized.encode("utf-8")).hexdigest(),
-            "91501d8801616771ea4cc14a29e02f7c8f9a67cd2e8de8deb6ef651b7a510aec",
+            "d5ddb8afd8dc8b784f64c52cfaee0b026d661bf5b9d5de5ac21dff667e5d1f3a",
         )
 
     def test_system_info_exposes_runtime_boundaries_without_secrets(self):
@@ -140,7 +140,7 @@ class VNextServiceTest(unittest.TestCase):
                 research_db = root / "research" / "research.db"
                 connection = sqlite3.connect(research_db)
                 connection.execute(
-                    "INSERT INTO schema_migrations(version, applied_at, summary) VALUES(4, 'future', 'future schema')"
+                    "INSERT INTO schema_migrations(version, applied_at, summary) VALUES(5, 'future', 'future schema')"
                 )
                 connection.commit()
                 connection.close()

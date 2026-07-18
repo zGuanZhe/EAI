@@ -400,9 +400,13 @@ class SourceService:
         providers: list[str] | None = None,
         limit: int = 24,
     ) -> tuple[list[SourceRecord], list[str]]:
-        local = self.search_documents(query, task_id, max(4, limit // 4)) + self.search_atlas(atlas_id, query, task_id, max(6, limit // 3))
+        local: list[SourceRecord] = []
         warnings: list[str] = []
         external: list[SourceRecord] = []
-        if source_policy == "local_and_external":
+        if source_policy == "atlas_only":
+            local = self.search_atlas(atlas_id, query, task_id, limit)
+        elif source_policy in {"local_only", "local_and_external"}:
+            local = self.search_documents(query, task_id, max(4, limit // 4)) + self.search_atlas(atlas_id, query, task_id, max(6, limit // 3))
+        if source_policy in {"external_only", "local_and_external"}:
             external, warnings = self.search_external(query, task_id, providers, max(8, limit - len(local)))
         return self.deduplicate(local + external)[:limit], warnings

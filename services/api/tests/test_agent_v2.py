@@ -19,6 +19,7 @@ from app.agent_v2.documents import import_document, import_open_source
 from app.agent_v2.capabilities import capability, validate_capability_arguments
 from app.agent_v2.context_broker import build_context_seed
 from app.agent_v2.evidence import assess_evidence
+from app.agent_v2.evidence_guard import guard_answer
 from app.agent_v2.models import AgentTurnRequest, ApprovalResolveRequest, DocumentRecord, Operation, OperationBatch, SandboxCommand, ServiceDecision, SourceRecord
 from app.agent_v2.provider import request_tool_decision, safe_provider_error
 from app.agent_v2.routing import fallback_service_decision, route_turn
@@ -87,6 +88,37 @@ class AgentRuntimeV2Test(unittest.TestCase):
                 return latest
             time.sleep(0.04)
         self.fail(f"task did not reach {expected}: {latest}")
+
+    def use_structured_research_response(
+        self,
+        text: str,
+        *,
+        source_kind: str | None = None,
+        evidence_level: str | None = None,
+    ) -> None:
+        runtime = main.get_agent_v2_runtime()
+
+        def stream(prompt, _profile, _overrides, _cancelled):
+            payload = json.loads(prompt)
+            sources = payload.get("sources") or []
+            candidates = [
+                source for source in sources
+                if (source_kind is None or source.get("provider") == source_kind or source.get("source_kind") == source_kind)
+                and (evidence_level is None or source.get("evidence_level") == evidence_level)
+            ]
+            selected = candidates[0] if candidates else sources[0]
+            answer = json.dumps({
+                "answer": text,
+                "claims": [{
+                    "text": text,
+                    "kind": "fact",
+                    "source_ids": [selected["source_id"]],
+                    "evidence_ids": list((selected.get("locator") or {}).get("evidence_ids") or []),
+                }],
+            }, ensure_ascii=False)
+            return iter([answer]), "fixture", "answer-draft"
+
+        runtime.dependencies.stream_model = stream
 
     def test_greeting_uses_conversation_without_sources_or_skills(self):
         thread = self.create_thread()
@@ -253,7 +285,7 @@ class AgentRuntimeV2Test(unittest.TestCase):
         self.assertNotIn("provider.invalid", cleaned)
 
     def test_local_research_uses_real_atlas_sources_and_evidence_levels(self):
-        os.environ["EAI_VNEXT_MOCK_OPENAI_RESPONSE"] = "当前证据显示不同路线存在明显分歧 [S1]。"
+        self.use_structured_research_response("当前证据显示不同路线存在明显分歧。")
         thread = self.create_thread()
         started = self.client.post(
             f"/api/vnext/threads/{thread['id']}/agent-v2/turns",
@@ -270,12 +302,12 @@ class AgentRuntimeV2Test(unittest.TestCase):
         self.assertTrue(all(source["evidence_level"] in {"curated_summary", "full_text"} for source in response["sources"]))
         saved = self.client.get(f"/api/vnext/threads/{thread['id']}").json()
         citations = saved["messages"][-1]["refs"]["citations"]
-        self.assertTrue(citations)
+        self.assertTrue(citations, saved["messages"][-1]["refs"])
         self.assertTrue(all(citation["source_ref"].get("source_id") for citation in citations))
 
     def test_atlas_only_constraint_skips_documents_and_network(self):
         decision = route_turn(AgentTurnRequest(message="只基于 Atlas 检索 VLA 论文"))
-        self.assertEqual(decision.source_policy, "local_only")
+        self.assertEqual(decision.source_policy, "atlas_only")
         self.assertIn("atlas_only", decision.requested_outputs)
         latest = route_turn(AgentTurnRequest(message="这个方向的最新进展是什么"))
         self.assertEqual(latest.source_policy, "local_and_external")
@@ -309,13 +341,13 @@ class AgentRuntimeV2Test(unittest.TestCase):
         assessment = assistant["refs"]["evidence_assessment"]
         self.assertEqual(assessment["requirement"], "full_text")
         self.assertFalse(assessment["sufficient"])
-        self.assertEqual(assessment["source_policy"], "local_only")
+        self.assertEqual(assessment["source_policy"], "atlas_only")
         self.assertEqual([item["action"] for item in assistant["refs"]["next_actions"]], ["inspect_sources"])
         artifact = next(item for item in self.client.get(f"/api/vnext/agent-v2/tasks/{task['id']}").json()["artifacts"] if item["kind"] == "evidence_set")
         self.assertFalse(artifact["payload"]["evidence_assessment"]["sufficient"])
 
     def test_detailed_research_searches_and_imports_open_original(self):
-        os.environ["EAI_VNEXT_MOCK_OPENAI_RESPONSE"] = "已基于开放全文核验方法与实验边界 [S3]。"
+        self.use_structured_research_response("已基于开放全文核验方法与实验边界。", evidence_level="full_text")
         thread = self.create_thread()
         runtime = main.get_agent_v2_runtime()
         now = main.utc_now()
@@ -377,7 +409,7 @@ class AgentRuntimeV2Test(unittest.TestCase):
         self.assertFalse(assessment.requires_original)
 
     def test_generic_local_research_uses_explicit_atlas_attachment(self):
-        os.environ["EAI_VNEXT_MOCK_OPENAI_RESPONSE"] = "The attached Atlas paper is available as evidence [S1]."
+        self.use_structured_research_response("The attached Atlas paper is available as evidence.", source_kind="atlas")
         thread = self.create_thread()
         paper_id = "deep_reinforcement_learning_for_robotics_real_world_successes"
         started = self.client.post(
@@ -721,6 +753,113 @@ class AgentRuntimeV2Test(unittest.TestCase):
         self.assertEqual(cached_warnings, warnings)
         self.assertEqual({item.id for item in store.list_sources("task-cached")}, {"source-openalex", "source-crossref"})
         store.close()
+
+    def test_source_policy_external_only_never_reads_local_evidence(self):
+        runtime = main.get_agent_v2_runtime()
+        external = SourceRecord(
+            id="source-external-only", source_kind="openalex", evidence_level="metadata",
+            title="External only", locator={"url": "https://openalex.org/W1"},
+            canonical_key="openalex:W1", content_hash="external", retrieved_at=main.utc_now(),
+            provider="openalex", access="open",
+        )
+        with patch.object(main, "search_for_agent") as local_search, patch.object(
+            runtime.sources, "search", return_value=([external], [])
+        ) as external_search:
+            response = self.client.post(
+                "/api/vnext/sources/search",
+                json={"query": "robot learning", "source_policy": "external_only", "limit": 4},
+            )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual([item["id"] for item in response.json()["sources"]], [external.id])
+        local_search.assert_not_called()
+        self.assertEqual(external_search.call_args.kwargs["source_policy"], "external_only")
+        invalid = self.client.post(
+            "/api/vnext/sources/search",
+            json={"query": "robot learning", "source_policy": "unknown-policy", "limit": 4},
+        )
+        self.assertEqual(invalid.status_code, 422)
+
+    def test_thread_draft_uses_revision_conflicts_and_restricted_attachment_ids(self):
+        thread = self.create_thread("Draft contract")
+        created = self.client.put(
+            f"/api/vnext/threads/{thread['id']}/draft",
+            json={
+                "expected_revision": 0, "text": "unsent", "agent_mode": "local",
+                "attachment_refs": [{"type": "document", "id": "document-1"}],
+            },
+        )
+        self.assertEqual(created.status_code, 200, created.text)
+        self.assertEqual(created.json()["revision"], 1)
+        conflict = self.client.put(
+            f"/api/vnext/threads/{thread['id']}/draft",
+            json={"expected_revision": 0, "text": "stale", "agent_mode": "auto", "attachment_refs": []},
+        )
+        self.assertEqual(conflict.status_code, 409, conflict.text)
+        self.assertEqual(conflict.json()["detail"]["current_draft"]["text"], "unsent")
+        unsafe = self.client.put(
+            f"/api/vnext/threads/{thread['id']}/draft",
+            json={
+                "expected_revision": 1, "text": "unsafe", "agent_mode": "auto",
+                "attachment_refs": [{"type": "document", "id": "C:\\private\\paper.pdf"}],
+            },
+        )
+        self.assertEqual(unsafe.status_code, 422)
+        deleted = self.client.request(
+            "DELETE", f"/api/vnext/threads/{thread['id']}/draft", json={"expected_revision": 1}
+        )
+        self.assertEqual(deleted.status_code, 200, deleted.text)
+        self.assertIsNone(self.client.get(f"/api/vnext/threads/{thread['id']}/draft").json()["draft"])
+
+    def test_evidence_guard_fails_closed_and_renders_only_declared_claims(self):
+        source = SourceRecord(
+            id="source-guard", task_id="task-guard", source_kind="local_document", evidence_level="full_text",
+            title="Guard source",
+            locator={"document_id": "doc-1", "chunk_id": "chunk-1", "page": 3, "evidence_ids": ["evidence-1"]},
+            excerpt="The experiment improves the metric.", canonical_key="document:doc-1",
+            content_hash="guard", retrieved_at=main.utc_now(), provider="local_fts", access="local",
+        )
+        plain = guard_answer("The experiment improves the metric [S1].", [source])
+        self.assertEqual(plain.guard_status, "invalid_draft")
+        self.assertEqual(plain.answer, "")
+
+        guarded = guard_answer(json.dumps({
+            "answer": "Unclaimed text must not survive. The experiment improves the metric.",
+            "claims": [{"text": "The experiment improves the metric.", "kind": "fact", "source_ids": [source.id], "evidence_ids": ["evidence-1"]}],
+        }), [source])
+        self.assertEqual(guarded.guard_status, "passed")
+        self.assertEqual(guarded.citation_integrity, "verified")
+        self.assertNotIn("Unclaimed", guarded.answer)
+        self.assertIn("[S1]", guarded.answer)
+
+        fabricated = guard_answer(json.dumps({
+            "answer": "Fabricated evidence.",
+            "claims": [{"text": "Fabricated evidence.", "kind": "fact", "source_ids": [source.id], "evidence_ids": ["missing-evidence"]}],
+        }), [source])
+        self.assertEqual(fabricated.guard_status, "blocked")
+        self.assertEqual(fabricated.answer, "")
+
+    def test_evidence_guard_accepts_evidence_distributed_across_declared_sources(self):
+        sources = [
+            SourceRecord(
+                id=f"source-union-{index}", task_id="task-union", source_kind="local_document",
+                evidence_level="full_text", title=f"Union source {index}",
+                locator={"document_id": f"doc-{index}", "chunk_id": f"chunk-{index}", "page": index,
+                         "evidence_ids": [f"evidence-{index}"]},
+                excerpt="Combined result evidence.", canonical_key=f"document:union-{index}",
+                content_hash=f"union-{index}", retrieved_at=main.utc_now(), provider="local_fts", access="local",
+            )
+            for index in (1, 2)
+        ]
+        guarded = guard_answer(json.dumps({
+            "answer": "Combined result evidence.",
+            "claims": [{
+                "text": "Combined result evidence.", "kind": "fact",
+                "source_ids": [source.id for source in sources],
+                "evidence_ids": ["evidence-1", "evidence-2"],
+            }],
+        }), sources)
+        self.assertEqual(guarded.guard_status, "passed")
+        self.assertEqual([binding.evidence_ids for binding in guarded.bindings], [["evidence-1"], ["evidence-2"]])
 
     def test_open_pdf_import_enforces_trusted_host_and_indexes_pdf(self):
         store = RuntimeStore(Path(self.temp.name) / "open-pdf-runtime")

@@ -44,6 +44,7 @@ import { computeAtlasPositions, computeHorizontalRevealDelta } from "../features
 import { AtlasSurface } from "../features/atlas/AtlasSurface.jsx";
 import { useAgentV2 } from "../features/thread/useAgentV2.js";
 import { useTurnAttachments } from "../features/thread/useTurnAttachments.js";
+import { useThreadDraft } from "../features/thread/useThreadDraft.js";
 import { ChangeSetInspector } from "../features/thread/ChangeSetInspector.jsx";
 import { ContextDrawer } from "../features/thread/ContextDrawer.jsx";
 import { TaskPackPreview } from "../features/taskPack/TaskPackPreview.jsx";
@@ -53,6 +54,7 @@ import { RunCenter } from "../features/tools/RunCenter.jsx";
 import { AgentApprovalInspector } from "../features/inspector/AgentApprovalInspector.jsx";
 import { ConfirmDialog, RightRail } from "../features/inspector/RightRail.jsx";
 import { InlineNotice } from "../components/ui/index.jsx";
+import { useNotifications } from "../app/Notifications.jsx";
 import { Sidebar } from "../layout/Sidebar.jsx";
 import { initialWorkspaceState, workspaceReducer } from "../state/workspaceReducer.js";
 import "../styles/tokens.css";
@@ -199,6 +201,7 @@ function usesCompactInspector() {
 }
 
 export function App() {
+  const { announce } = useNotifications();
   const [workspaceState, dispatchWorkspace] = useReducer(workspaceReducer, initialWorkspaceState);
   const { surface, rail, railOpen, sidebarOpen, toolsPage } = workspaceState;
   const [projects, setProjects] = useState([]);
@@ -236,12 +239,25 @@ export function App() {
   const [activeChangesetId, setActiveChangesetId] = useState(null);
   const [atlasFocusPaperId, setAtlasFocusPaperId] = useState(null);
   const researchReadOnly = Boolean(systemInfo?.research_store?.read_only);
+  useEffect(() => {
+    if (!status || status === "就绪" || status.startsWith("正在")) return;
+    const tone = /失败|无法|错误|冲突/.test(status) ? "error" : "info";
+    announce(status, tone);
+  }, [announce, status]);
   const {
     attachments: turnAttachments,
     addAttachment: addTurnAttachment,
     removeAttachment: removeTurnAttachment,
-    clearAttachments: clearTurnAttachments
+    clearAttachments: clearTurnAttachments,
+    replaceAttachments: replaceTurnAttachments
   } = useTurnAttachments(thread?.id);
+  const {
+    flushDraft, clearDraftAfterPersist, draftConflict, loadRemoteDraft, overwriteRemoteDraft
+  } = useThreadDraft({
+    threadId: thread?.id, text: composer, setText: setComposer,
+    agentMode, setAgentMode, attachments: turnAttachments,
+    replaceAttachments: replaceTurnAttachments, enabled: !researchReadOnly,
+  });
   const bundleCacheRef = useRef(new Map());
   const bundleRequestRef = useRef(0);
   const memoryRequestRef = useRef(0);
@@ -1443,8 +1459,12 @@ export function App() {
     if (!text) return;
     try {
       if (isRunning) {
+        const draftRevision = await flushDraft();
         const steered = await steerThreadChat(text);
-        if (steered) setComposer("");
+        if (steered) {
+          await clearDraftAfterPersist(draftRevision);
+          setComposer("");
+        }
         return;
       }
       if (text === "/context") {
@@ -1467,13 +1487,25 @@ export function App() {
         }
       } else if (text.startsWith("/")) {
         setContextDrawerOpen(false);
+        const draftRevision = await flushDraft();
         const completed = await sendThreadChat(text, { surface, turnAttachments: currentTurnAttachments(), intentOverride: agentMode });
-        if (completed) clearTurnAttachments();
-        setStatus("未识别命令，已作为问题询问 AI");
+        if (completed) {
+          await clearDraftAfterPersist(draftRevision);
+          clearTurnAttachments();
+          setComposer("");
+          setStatus("未识别命令，已作为问题询问 AI");
+        }
+        return;
       } else {
         setContextDrawerOpen(false);
+        const draftRevision = await flushDraft();
         const completed = await sendThreadChat(text, { surface, turnAttachments: currentTurnAttachments(), intentOverride: agentMode });
-        if (completed) clearTurnAttachments();
+        if (completed) {
+          await clearDraftAfterPersist(draftRevision);
+          clearTurnAttachments();
+          setComposer("");
+        }
+        return;
       }
       setComposer("");
     } catch (error) {
@@ -1533,6 +1565,13 @@ export function App() {
           <div className="research-read-only-banner" role="status">
             <InlineNotice tone="warning" title="只读模式">
               数据库 schema {systemInfo.research_store.schema_version} 高于当前支持的 {systemInfo.research_store.supported_schema_version}；浏览和导出可用，写入与执行已停用。
+            </InlineNotice>
+          </div>
+        )}
+        {draftConflict && (
+          <div className="research-read-only-banner" role="alert">
+            <InlineNotice tone="warning" title="另一窗口更新了草稿" actions={<><button type="button" onClick={loadRemoteDraft}>载入新版本</button><button type="button" onClick={() => overwriteRemoteDraft().catch((error) => setStatus(`覆盖草稿失败：${error.message}`))}>使用本窗口内容</button></>}>
+              为防止静默覆盖，当前输入仍保留在本窗口。
             </InlineNotice>
           </div>
         )}

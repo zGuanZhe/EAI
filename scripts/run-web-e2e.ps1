@@ -46,7 +46,7 @@ try {
     $env:VITE_EAI_API_TARGET = "http://127.0.0.1:$ApiPort"
     # Keep this script ASCII-compatible because Windows PowerShell 5.1 may read UTF-8
     # files without a BOM using the active ANSI code page.
-    $env:EAI_VNEXT_MOCK_OPENAI_RESPONSE = "Agent Runtime v2 natural response."
+    $env:EAI_VNEXT_MOCK_OPENAI_RESPONSE = '{"answer":"Agent Runtime v2 natural response.","claims":[{"text":"Agent Runtime v2 natural response.","source_ids":["source_44a118a6842bef37da27"],"evidence_ids":[],"kind":"fact"}]}'
     $env:EAI_V2_MOCK_CAPABILITY_DELAY_MS = "350"
 
     $Backend = Start-Process -FilePath $Python -ArgumentList "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", $ApiPort -WorkingDirectory (Join-Path $Root "services\api") -RedirectStandardOutput (Join-Path $Logs "backend.out.log") -RedirectStandardError (Join-Path $Logs "backend.err.log") -WindowStyle Hidden -PassThru

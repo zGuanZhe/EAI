@@ -14,18 +14,23 @@ export function DesktopSettings({ open, onClose, systemInfo, secrets }) {
   const [secret, setSecret] = useState("");
   const [status, setStatus] = useState("");
 
-  const restartUi = () => { resetRuntimeInfo(); window.location.reload(); };
+  const restartService = async () => {
+    setStatus("正在重启本地服务");
+    await invoke("restart_backend");
+    resetRuntimeInfo();
+    setStatus("模型通道已更新");
+  };
   const save = async () => {
     if (!window.__TAURI_INTERNALS__) return setStatus("浏览器开发模式不保存系统密钥");
     if (!secret.trim()) return setStatus("请输入密钥");
     setStatus("正在写入 Windows Credential Manager");
-    try { await invoke("set_provider_secret", { provider, secret: secret.trim() }); setSecret(""); restartUi(); }
+    try { await invoke("set_provider_secret", { provider, secret: secret.trim() }); setSecret(""); await restartService(); }
     catch (error) { setStatus(String(error)); }
   };
   const clear = async () => {
     if (!window.__TAURI_INTERNALS__) return setStatus("浏览器开发模式没有系统密钥");
     setStatus("正在清除密钥");
-    try { await invoke("clear_provider_secret", { provider }); restartUi(); }
+    try { await invoke("clear_provider_secret", { provider }); await restartService(); }
     catch (error) { setStatus(String(error)); }
   };
 

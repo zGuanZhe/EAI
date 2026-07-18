@@ -13,12 +13,13 @@ from pathlib import Path
 from typing import Any, Iterator
 
 from ..core.errors import SchemaReadOnlyError
+from ..core.errors import RevisionConflictError
 from .models import ClaimRecord, EvidenceBundle, EvidenceSpan, KnowledgeStatus, ResearchWork, SyncJob
 from .ontology import ontology_packs
 from .embeddings import DIMENSIONS, PROFILE_ID, LocalEmbeddingProfile
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 LAYER_PRIORITY = {"derived": 1, "curated": 2, "personal": 3}
 QUERY_ALIASES = {
     "强化学习": ["reinforcement learning", "rl"],
@@ -194,12 +195,15 @@ class ResearchStore:
         return self._connection
 
     def compatibility_status(self) -> dict[str, Any]:
-        return {
+        status = {
             "schema_version": self.schema_version,
             "supported_schema_version": SCHEMA_VERSION,
             "read_only": self.read_only,
             "reason": "schema_newer_than_app" if self.read_only else "",
         }
+        if not self.read_only and self.schema_version >= 4:
+            status["projection"] = self.projection_status()
+        return status
 
     def ensure_writable(self) -> None:
         if self.read_only:
@@ -355,6 +359,25 @@ class ResearchStore:
                     created_at TEXT NOT NULL, updated_at TEXT NOT NULL, source_hash TEXT NOT NULL,
                     PRIMARY KEY(kind, id)
                 );
+                CREATE TABLE IF NOT EXISTS projection_journal (
+                    id TEXT PRIMARY KEY, entity_kind TEXT NOT NULL, entity_id TEXT NOT NULL,
+                    entity_revision INTEGER NOT NULL, operation TEXT NOT NULL, payload TEXT NOT NULL,
+                    payload_hash TEXT NOT NULL, target_relpath TEXT NOT NULL, status TEXT NOT NULL,
+                    attempt_count INTEGER NOT NULL, last_error_code TEXT NOT NULL,
+                    created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+                    UNIQUE(entity_kind, entity_id, entity_revision)
+                );
+                CREATE INDEX IF NOT EXISTS idx_projection_journal_status
+                    ON projection_journal(status, updated_at);
+                CREATE TABLE IF NOT EXISTS thread_drafts (
+                    thread_id TEXT PRIMARY KEY, revision INTEGER NOT NULL, text TEXT NOT NULL,
+                    agent_mode TEXT NOT NULL, attachment_refs TEXT NOT NULL, updated_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS evidence_normalization (
+                    evidence_id TEXT PRIMARY KEY, algorithm_version TEXT NOT NULL,
+                    normalized_hash TEXT NOT NULL, page INTEGER, char_map TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS research_entities (
                     id TEXT PRIMARY KEY, entity_type TEXT NOT NULL, layer TEXT NOT NULL,
                     title TEXT NOT NULL, summary TEXT NOT NULL, status TEXT NOT NULL,
@@ -402,7 +425,7 @@ class ResearchStore:
                 self._connection.execute("DELETE FROM source_snapshots WHERE source_kind='atlas'")
             self._connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(version, applied_at, summary) VALUES(?, ?, ?)",
-                (SCHEMA_VERSION, utc_now(), "Evidence graph and normalized research state projection"),
+                (SCHEMA_VERSION, utc_now(), "Thread drafts, projection outbox, and evidence normalization"),
             )
             for pack in ontology_packs():
                 self._connection.execute(
@@ -706,20 +729,53 @@ class ResearchStore:
             )
         return {"records": len(paths)}
 
-    def save_record(self, kind: str, record_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def save_record(
+        self,
+        kind: str,
+        record_id: str,
+        payload: dict[str, Any],
+        *,
+        projection_target: str | None = None,
+    ) -> dict[str, Any]:
         now = str(payload.get("updated_at") or utc_now())
         created_at = str(payload.get("created_at") or now)
-        revision = int(payload.get("revision") or 0)
         serialized = json.dumps(payload, ensure_ascii=False)
         with self.transaction() as connection:
+            current = connection.execute(
+                "SELECT revision, source_hash FROM research_records WHERE kind=? AND id=?", (kind, record_id)
+            ).fetchone()
+            journal_revision = int(connection.execute(
+                "SELECT COALESCE(MAX(entity_revision), 0) FROM projection_journal WHERE entity_kind=? AND entity_id=?",
+                (kind, record_id),
+            ).fetchone()[0])
+            serialized_hash = content_hash(serialized)
+            if current and current["source_hash"] == serialized_hash:
+                revision = int(current["revision"])
+            else:
+                revision = max(
+                    int(payload.get("revision") or 0),
+                    int(current["revision"] if current else 0) + 1,
+                    journal_revision + 1,
+                )
             connection.execute(
                 """INSERT INTO research_records(kind, id, payload, revision, created_at, updated_at, source_hash)
                    VALUES(?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT(kind, id) DO UPDATE SET payload=excluded.payload, revision=excluded.revision,
                      updated_at=excluded.updated_at, source_hash=excluded.source_hash""",
-                (kind, record_id, serialized, revision, created_at, now, content_hash(serialized)),
+                (kind, record_id, serialized, revision, created_at, now, serialized_hash),
             )
             self._project_personal_record(connection, kind, record_id, payload)
+            if projection_target:
+                payload_hash = serialized_hash
+                journal_id = stable_id("projection", kind, record_id, str(revision))
+                connection.execute(
+                    """INSERT INTO projection_journal
+                       (id, entity_kind, entity_id, entity_revision, operation, payload, payload_hash,
+                        target_relpath, status, attempt_count, last_error_code, created_at, updated_at)
+                       VALUES(?, ?, ?, ?, 'upsert', ?, ?, ?, 'pending', 0, '', ?, ?)
+                       ON CONFLICT(entity_kind, entity_id, entity_revision) DO NOTHING""",
+                    (journal_id, kind, record_id, revision, serialized, payload_hash, projection_target, now, now),
+                )
         return payload
 
     def get_record(self, kind: str, record_id: str) -> dict[str, Any] | None:
@@ -727,8 +783,22 @@ class ResearchStore:
             row = self._connection.execute("SELECT payload FROM research_records WHERE kind=? AND id=?", (kind, record_id)).fetchone()
         return json.loads(row["payload"]) if row else None
 
-    def delete_record(self, kind: str, record_id: str) -> None:
+    def delete_record(self, kind: str, record_id: str, *, projection_target: str | None = None) -> None:
         with self.transaction() as connection:
+            current = connection.execute(
+                "SELECT revision FROM research_records WHERE kind=? AND id=?", (kind, record_id)
+            ).fetchone()
+            latest_journal = connection.execute(
+                """SELECT entity_revision, operation FROM projection_journal
+                   WHERE entity_kind=? AND entity_id=? ORDER BY entity_revision DESC LIMIT 1""",
+                (kind, record_id),
+            ).fetchone()
+            if current is None and latest_journal and latest_journal["operation"] == "delete":
+                return
+            revision = max(
+                int(current["revision"] if current else 0),
+                int(latest_journal["entity_revision"] if latest_journal else 0),
+            ) + 1
             connection.execute("DELETE FROM research_records WHERE kind=? AND id=?", (kind, record_id))
             connection.execute(
                 "DELETE FROM research_state_edges WHERE source_record_kind=? AND source_record_id=?", (kind, record_id)
@@ -736,6 +806,128 @@ class ResearchStore:
             connection.execute(
                 "DELETE FROM research_entities WHERE source_record_kind=? AND source_record_id=?", (kind, record_id)
             )
+            if projection_target:
+                now = utc_now()
+                connection.execute(
+                    """INSERT INTO projection_journal
+                       (id, entity_kind, entity_id, entity_revision, operation, payload, payload_hash,
+                        target_relpath, status, attempt_count, last_error_code, created_at, updated_at)
+                       VALUES(?, ?, ?, ?, 'delete', '{}', '', ?, 'pending', 0, '', ?, ?)
+                       ON CONFLICT(entity_kind, entity_id, entity_revision) DO NOTHING""",
+                    (stable_id("projection", kind, record_id, str(revision)), kind, record_id, revision, projection_target, now, now),
+                )
+
+    def list_projection_jobs(
+        self, *, statuses: tuple[str, ...] = ("pending", "failed"), entity_kind: str | None = None,
+        entity_id: str | None = None, limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        clauses = [f"status IN ({','.join('?' for _ in statuses)})"]
+        values: list[Any] = list(statuses)
+        if entity_kind:
+            clauses.append("entity_kind=?")
+            values.append(entity_kind)
+        if entity_id:
+            clauses.append("entity_id=?")
+            values.append(entity_id)
+        values.append(max(1, min(limit, 1000)))
+        with self._lock:
+            rows = self._connection.execute(
+                f"SELECT * FROM projection_journal WHERE {' AND '.join(clauses)} ORDER BY entity_revision, created_at LIMIT ?",
+                values,
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def mark_projection_job(self, job_id: str, status: str, error_code: str = "") -> None:
+        if status not in {"applied", "failed", "superseded"}:
+            raise ValueError("invalid projection status")
+        with self.transaction() as connection:
+            connection.execute(
+                """UPDATE projection_journal SET status=?, attempt_count=attempt_count+1,
+                   last_error_code=?, updated_at=? WHERE id=?""",
+                (status, error_code[:120], utc_now(), job_id),
+            )
+
+    def latest_projection_revision(self, entity_kind: str, entity_id: str) -> int:
+        with self._lock:
+            row = self._connection.execute(
+                """SELECT COALESCE(MAX(entity_revision), 0) revision FROM projection_journal
+                   WHERE entity_kind=? AND entity_id=?""",
+                (entity_kind, entity_id),
+            ).fetchone()
+        return int(row["revision"])
+
+    def projection_status(self) -> dict[str, int]:
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT status, COUNT(*) count FROM projection_journal GROUP BY status"
+            ).fetchall()
+        return {row["status"]: int(row["count"]) for row in rows}
+
+    def get_thread_draft(self, thread_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT * FROM thread_drafts WHERE thread_id=?", (thread_id,)
+            ).fetchone()
+        if not row:
+            return None
+        return {
+            "thread_id": row["thread_id"], "revision": int(row["revision"]), "text": row["text"],
+            "agent_mode": row["agent_mode"], "attachment_refs": json.loads(row["attachment_refs"]),
+            "updated_at": row["updated_at"],
+        }
+
+    def put_thread_draft(
+        self, thread_id: str, *, expected_revision: int, text: str, agent_mode: str,
+        attachment_refs: list[dict[str, str]],
+    ) -> dict[str, Any]:
+        now = utc_now()
+        with self.transaction() as connection:
+            current = connection.execute(
+                "SELECT * FROM thread_drafts WHERE thread_id=?", (thread_id,)
+            ).fetchone()
+            current_revision = int(current["revision"]) if current else 0
+            if expected_revision != current_revision:
+                current_payload = None if not current else {
+                    "thread_id": current["thread_id"], "revision": current_revision, "text": current["text"],
+                    "agent_mode": current["agent_mode"], "attachment_refs": json.loads(current["attachment_refs"]),
+                    "updated_at": current["updated_at"],
+                }
+                raise RevisionConflictError({
+                    "code": "draft_revision_conflict", "message": "草稿已在另一窗口更新。",
+                    "expected_revision": expected_revision, "current_revision": current_revision,
+                    "current_draft": current_payload,
+                })
+            revision = current_revision + 1
+            connection.execute(
+                """INSERT INTO thread_drafts(thread_id, revision, text, agent_mode, attachment_refs, updated_at)
+                   VALUES(?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(thread_id) DO UPDATE SET revision=excluded.revision, text=excluded.text,
+                     agent_mode=excluded.agent_mode, attachment_refs=excluded.attachment_refs,
+                     updated_at=excluded.updated_at""",
+                (thread_id, revision, text, agent_mode, json.dumps(attachment_refs, ensure_ascii=False), now),
+            )
+        return {
+            "thread_id": thread_id, "revision": revision, "text": text, "agent_mode": agent_mode,
+            "attachment_refs": attachment_refs, "updated_at": now,
+        }
+
+    def delete_thread_draft(self, thread_id: str, *, expected_revision: int) -> None:
+        with self.transaction() as connection:
+            current = connection.execute(
+                "SELECT * FROM thread_drafts WHERE thread_id=?", (thread_id,)
+            ).fetchone()
+            current_revision = int(current["revision"]) if current else 0
+            if current and expected_revision != current_revision:
+                raise RevisionConflictError({
+                    "code": "draft_revision_conflict", "message": "草稿已在另一窗口更新，未删除较新的内容。",
+                    "expected_revision": expected_revision, "current_revision": current_revision,
+                    "current_draft": {
+                        "thread_id": current["thread_id"], "revision": current_revision, "text": current["text"],
+                        "agent_mode": current["agent_mode"], "attachment_refs": json.loads(current["attachment_refs"]),
+                        "updated_at": current["updated_at"],
+                    },
+                })
+            connection.execute("DELETE FROM thread_drafts WHERE thread_id=?", (thread_id,))
 
     def list_records(self, kind: str) -> list[dict[str, Any]]:
         with self._lock:
@@ -989,6 +1181,28 @@ class ResearchStore:
             return None, []
         wanted = set(claim.evidence_ids)
         return claim, [item for item in evidence if item.id in wanted]
+
+    def get_evidence_span(self, evidence_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            row = self._connection.execute("SELECT * FROM evidence_spans WHERE id=?", (evidence_id,)).fetchone()
+        if not row:
+            return None
+        return {**dict(row), "locator": json.loads(row["locator"])}
+
+    def save_evidence_normalization(
+        self, evidence_id: str, *, algorithm_version: str, normalized_hash_value: str,
+        page: int | None, char_map: list[list[int]],
+    ) -> None:
+        with self.transaction() as connection:
+            connection.execute(
+                """INSERT INTO evidence_normalization
+                   (evidence_id, algorithm_version, normalized_hash, page, char_map, updated_at)
+                   VALUES(?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(evidence_id) DO UPDATE SET algorithm_version=excluded.algorithm_version,
+                     normalized_hash=excluded.normalized_hash, page=excluded.page,
+                     char_map=excluded.char_map, updated_at=excluded.updated_at""",
+                (evidence_id, algorithm_version, normalized_hash_value, page, json.dumps(char_map), utc_now()),
+            )
 
     def find_document_by_hash(self, digest: str) -> dict[str, Any] | None:
         with self._lock:

@@ -30,5 +30,10 @@ export function useTurnAttachments(threadId) {
     setByThread((current) => ({ ...current, [threadId]: [] }));
   }, [threadId]);
 
-  return { attachments, addAttachment, removeAttachment, clearAttachments };
+  const replaceAttachments = useCallback((next) => {
+    if (!threadId) return;
+    setByThread((current) => ({ ...current, [threadId]: Array.isArray(next) ? next : [] }));
+  }, [threadId]);
+
+  return { attachments, addAttachment, removeAttachment, clearAttachments, replaceAttachments };
 }

@@ -162,6 +162,10 @@
 .campaign-artifact { padding: 8px 0; border-bottom: 1px solid var(--line); }
 .campaign-artifact strong { font-size: 12px; }
 .campaign-inspector-actions { display: flex; justify-content: flex-end; gap: 8px; }
+@media (max-width: 1119px) {
+  .campaign-workspace.inspector-open { padding-right: 0; }
+}
+
 @media (max-width: 760px) {
   .canvas-readiness-line { flex-wrap: wrap; padding-inline: 16px; }
   .canvas-readiness-line p { order: 3; min-width: 100%; margin-left: 0; }
@@ -193,4 +197,4 @@
   .campaign-review-list small { grid-column: 2; }
 }
 
-@media (prefers-reduced-motion: reduce) { .campaign-branch { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .campaign-branch, .campaign-workspace { transition: none; } }

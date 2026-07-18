@@ -53,6 +53,12 @@ class CapabilityDispatcher:
                 "long_term_memories": list(full.get("long_term_memories") or [])[:limit],
             }
             summary = f"已读取 {len(data['context_cards'])} 条长期资料和当前附件。"
+        elif capability_id == "atlas.search":
+            sources = self.sources.search_atlas(
+                str(arguments.get("atlas_id") or "G"), str(arguments["query"]), task.id,
+                int(arguments.get("limit") or 18),
+            )
+            summary = f"在 Atlas 中找到 {len(sources)} 个策展来源。"
         elif capability_id == "documents.search":
             sources = self.sources.search_documents(str(arguments["query"]), task.id, int(arguments.get("limit") or 10))
             summary = f"在本地全文中找到 {len(sources)} 个证据片段。"

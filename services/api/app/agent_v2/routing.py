@@ -26,7 +26,7 @@ def apply_source_constraints(decision: ServiceDecision, request: AgentTurnReques
     if atlas_only:
         if decision.service == "conversation":
             decision.service = "evidence_research"
-        decision.source_policy = "local_only"
+        decision.source_policy = "atlas_only"
         decision.requested_outputs = list(dict.fromkeys(decision.requested_outputs + ["atlas_only", "evidence_set"]))
         decision.reason = "用户明确要求只使用 Atlas。"
     elif latest and decision.service in {"evidence_research", "document_reading", "synthesis"}:
@@ -141,7 +141,7 @@ def route_turn(
                     "service": "service id",
                     "objective": "本轮目标",
                     "depth": "quick|standard|deep",
-                    "source_policy": "none|local_only|local_and_external",
+                    "source_policy": "none|atlas_only|local_only|external_only|local_and_external",
                     "requested_outputs": [],
                     "confidence": 0.0,
                     "requires_clarification": False,

@@ -5,6 +5,7 @@ import {
   PackageOpen, Play, Search, ShieldCheck, Sparkles, Square, X
 } from "lucide-react";
 import { Button, Drawer, EmptyState, InlineNotice, SegmentedControl, StatusDot, cx } from "../../components/ui/index.jsx";
+import { useMediaQuery } from "../../app/useMediaQuery.js";
 import { buildCampaignTree, CAMPAIGN_STAGE_LABELS } from "./model.js";
 
 const STATUS_LABELS = {
@@ -82,7 +83,7 @@ function BranchInspector({ snapshot, branchId, approval, onClose, onPrepare, onP
   const session = snapshot?.sessions?.find((item) => item.id === branch?.session_id);
   const checkpoint = snapshot?.checkpoints?.find((item) => item.id === branch?.checkpoint_id);
   const relevantApproval = approval?.payload?.branch_id === branchId ? approval : null;
-  const overlay = typeof window !== "undefined" && window.matchMedia("(max-width: 1119px)").matches;
+  const overlay = useMediaQuery("(max-width: 1119px)");
   return <Drawer open={Boolean(branch)} onClose={onClose} title={branch?.title || "实验分支"} eyebrow={stage?.title || "Campaign"} tone="violet" overlay={overlay} className="campaign-branch-drawer" footer={branch && <div className="campaign-inspector-actions">
     {relevantApproval ? <><Button variant="quiet" onClick={() => onResolve("reject")}>拒绝</Button><Button variant="primary" onClick={() => onResolve("approve")}><ShieldCheck size={14} />授权会话</Button></> : <>
       {branch.status === "proposed" && <Button variant="primary" onClick={() => onPrepare(branch.id)}><Play size={14} />准备分支会话</Button>}

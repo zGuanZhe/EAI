@@ -27,6 +27,15 @@ export function AgentV2Activity({ message, onInspectApproval, onUndoOperationBat
   const artifactCount = summary.artifact_count ?? v2.artifacts?.length ?? 0;
   const artifacts = refs.agent_v2_artifacts || v2.artifacts || [];
   const commandPreview = artifacts.find((item) => item.kind === "command_preview");
+  const guardStatus = refs.guard_status || v2.guard_status;
+  const citationIntegrity = refs.citation_integrity || v2.citation_integrity;
+  const guardLabel = service === "conversation" || !guardStatus || guardStatus === "not_required"
+    ? ""
+    : guardStatus === "passed" && citationIntegrity === "verified"
+      ? "引用定位已核验"
+      : guardStatus === "blocked" || guardStatus === "invalid_draft"
+        ? "未通过核验"
+        : "证据有限";
   const [audit, setAudit] = useState(null);
   const [auditLoading, setAuditLoading] = useState(false);
 
@@ -48,8 +57,8 @@ export function AgentV2Activity({ message, onInspectApproval, onUndoOperationBat
       <div className="agent-v2-status-row">
         {running ? <LoaderCircle className="spin" size={14} /> : <Check size={14} />}
         <span>{running ? (v2.status || "正在理解你的目标") : `${SERVICE_LABELS[service] || summary.service_label || "任务"}已完成`}</span>
-        {!running && (sourceCount > 0 || artifactCount > 0) && (
-          <em>{sourceCount ? `${sourceCount} 个来源` : ""}{sourceCount && artifactCount ? " · " : ""}{artifactCount ? `${artifactCount} 个产物` : ""}</em>
+        {!running && (guardLabel || sourceCount > 0 || artifactCount > 0) && (
+          <em>{guardLabel}{guardLabel && (sourceCount > 0 || artifactCount > 0) ? " · " : ""}{sourceCount ? `${sourceCount} 个来源` : ""}{sourceCount && artifactCount ? " · " : ""}{artifactCount ? `${artifactCount} 个产物` : ""}</em>
         )}
       </div>
       {!running && service !== "conversation" ? (

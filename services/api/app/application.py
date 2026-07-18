@@ -57,14 +57,17 @@ from .core.secrets import read_secret_data, safe_secret_status, secret_candidate
 from .core.storage import atomic_write_json_file, backup_file, read_json_file
 from .factory import create_app
 from .routers.system import create_system_router
+from .routers.drafts import create_draft_router
 from .repositories.personal import safe_document_path, safe_object_memory_path
+from .services.projection import ProjectionService
+from .services.drafts import ThreadDraftService
 from .research.context import build_research_state, evidence_bundle_to_sources, search_for_agent
 from .research.documents import import_document as import_research_document
 from .research.enrichment import KnowledgeEnrichmentService
 from .research.router import create_research_router
 from .research.store import ResearchStore
 
-SERVICE_VERSION = "0.4.1"
+SERVICE_VERSION = "0.5.0"
 AGENT_EVENT_BUFFERS: dict[str, list[dict[str, Any]]] = {}
 CANCELLED_AGENT_RUNS: set[str] = set()
 DEFAULT_ROOT = Path(__file__).resolve().parents[3]
@@ -134,6 +137,27 @@ def read_json(path: Path) -> Any:
 
 def atomic_write_json(path: Path, data: Any) -> None:
     atomic_write_json_file(path, data, ensure_dirs)
+
+
+def projection_target(path: Path) -> str:
+    resolved = path.resolve()
+    personal = PERSONAL_DIR.resolve()
+    if not resolved.is_relative_to(personal):
+        raise ValueError("projection target must remain inside personal data")
+    return resolved.relative_to(personal).as_posix()
+
+
+def save_projected_record(kind: str, record_id: str, payload: dict[str, Any], path: Path) -> dict[str, Any]:
+    store = get_research_store()
+    saved = store.save_record(kind, record_id, payload, projection_target=projection_target(path))
+    ProjectionService(store, PERSONAL_DIR).replay(entity_kind=kind, entity_id=record_id, limit=20)
+    return saved
+
+
+def delete_projected_record(kind: str, record_id: str, path: Path) -> None:
+    store = get_research_store()
+    store.delete_record(kind, record_id, projection_target=projection_target(path))
+    ProjectionService(store, PERSONAL_DIR).replay(entity_kind=kind, entity_id=record_id, limit=20)
 
 
 def backup_thread_file(path: Path) -> None:
@@ -252,6 +276,7 @@ app.include_router(
         research_status=lambda: get_research_store().compatibility_status(),
     )
 )
+app.include_router(create_draft_router(lambda: ThreadDraftService(get_research_store())))
 
 
 @app.on_event("startup")
@@ -259,6 +284,7 @@ def on_startup() -> None:
     ensure_dirs()
     if get_research_store().read_only:
         return
+    ProjectionService(get_research_store(), PERSONAL_DIR).replay(limit=500)
     get_agent_v2_runtime()
     get_campaign_service().mark_incomplete_interrupted()
 
@@ -288,8 +314,7 @@ def write_thread(doc: ThreadDoc, backup: bool = True) -> ThreadDoc:
         backup_thread_file(path)
     doc.revision += 1
     doc.updated_at = utc_now()
-    get_research_store().save_record("thread", doc.id, doc.model_dump(mode="json"))
-    atomic_write_json(path, doc.model_dump(mode="json"))
+    save_projected_record("thread", doc.id, doc.model_dump(mode="json"), path)
     return doc
 
 
@@ -305,8 +330,7 @@ def write_project(doc: ProjectDoc) -> ProjectDoc:
     get_research_store().ensure_writable()
     doc = ProjectDoc.model_validate(doc.model_dump(mode="json") if isinstance(doc, ProjectDoc) else doc)
     doc.updated_at = utc_now()
-    get_research_store().save_record("project", doc.id, doc.model_dump(mode="json"))
-    atomic_write_json(safe_project_path(doc.id), doc.model_dump(mode="json"))
+    save_projected_record("project", doc.id, doc.model_dump(mode="json"), safe_project_path(doc.id))
     return doc
 
 
@@ -348,8 +372,7 @@ def write_object_memory(atlas_id: str, object_type: str, object_id: str, memory:
     }
     memory.tags = [tag.strip() for tag in memory.tags if tag.strip()]
     memory.updated_at = utc_now()
-    get_research_store().save_record(f"object_memory", f"{atlas_id}:{object_type}:{object_id}", memory.model_dump(mode="json"))
-    atomic_write_json(path, memory.model_dump(mode="json"))
+    save_projected_record("object_memory", f"{atlas_id}:{object_type}:{object_id}", memory.model_dump(mode="json"), path)
     return memory
 
 
@@ -375,8 +398,7 @@ def write_atlas_updates(doc: AtlasUpdateDoc) -> AtlasUpdateDoc:
     get_research_store().ensure_writable()
     path = safe_atlas_update_path(doc.atlas_id)
     doc.updated_at = utc_now()
-    get_research_store().save_record("atlas_update", doc.atlas_id, doc.model_dump(mode="json"))
-    atomic_write_json(path, doc.model_dump(mode="json"))
+    save_projected_record("atlas_update", doc.atlas_id, doc.model_dump(mode="json"), path)
     return doc
 
 
@@ -392,8 +414,7 @@ def write_lab_run(run: LabRun) -> LabRun:
     get_research_store().ensure_writable()
     run = LabRun.model_validate(run.model_dump(mode="json") if isinstance(run, LabRun) else run)
     run.updated_at = utc_now()
-    get_research_store().save_record("lab_run", run.id, run.model_dump(mode="json"))
-    atomic_write_json(safe_lab_run_path(run.id), run.model_dump(mode="json"))
+    save_projected_record("lab_run", run.id, run.model_dump(mode="json"), safe_lab_run_path(run.id))
     return run
 
 
@@ -776,8 +797,7 @@ def delete_project(project_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail="project not found")
     if path.exists():
         backup_deleted_file(path, "project")
-        path.unlink()
-    get_research_store().delete_record("project", project_id)
+    delete_projected_record("project", project_id, path)
     reassigned = 0
     for raw in get_research_store().list_records("thread"):
         try:
@@ -1092,8 +1112,7 @@ def delete_thread(thread_id: str) -> dict[str, str]:
         raise HTTPException(status_code=404, detail="thread not found")
     if path.exists():
         backup_deleted_file(path, "thread")
-        path.unlink()
-    get_research_store().delete_record("thread", thread_id)
+    delete_projected_record("thread", thread_id, path)
     return {"deleted": thread_id}
 
 
@@ -5800,13 +5819,17 @@ def search_agent_v2_sources(payload: AgentV2SourceSearchRequest) -> AgentV2Sourc
     if payload.thread_id:
         atlas_id = load_thread(payload.thread_id).active_atlas_id
     query = safe_message_content(payload.query, 1200)
-    _, local_sources = search_for_agent(
-        get_research_store(), query=query, atlas_id=atlas_id, task_id=None, attachments=[], limit=payload.limit,
-    )
+    runtime = get_agent_v2_runtime()
+    local_sources = []
+    if payload.source_policy == "atlas_only":
+        local_sources = runtime.sources.search_atlas(atlas_id, query, None, payload.limit)
+    elif payload.source_policy in {"local_only", "local_and_external"}:
+        _, local_sources = search_for_agent(
+            get_research_store(), query=query, atlas_id=atlas_id, task_id=None, attachments=[], limit=payload.limit,
+        )
     warnings: list[str] = []
     sources = local_sources
-    if payload.source_policy not in {"atlas_only", "local_only"}:
-        runtime = get_agent_v2_runtime()
+    if payload.source_policy in {"external_only", "local_and_external"}:
         external, warnings = runtime.sources.search(
             query=query, atlas_id=atlas_id, task_id=None, source_policy="external_only",
             providers=payload.providers or None, limit=payload.limit,

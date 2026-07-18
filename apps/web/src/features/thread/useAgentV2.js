@@ -105,6 +105,9 @@ export function useAgentV2({ thread, surface, setThread, refreshThreads, setSurf
         v2.evidence_gaps = [...(v2.evidence_gaps || []), payload];
       } else if (event === "answer_ready") {
         v2.answer_validated = Boolean(payload.validated);
+        v2.guard_status = payload.guard_status;
+        v2.citation_integrity = payload.citation_integrity;
+        v2.evidence_sufficiency = payload.evidence_sufficiency;
       } else if (event === "artifact_ready") {
         v2.artifacts = replaceById(v2.artifacts, payload);
         refs.agent_v2_artifacts = replaceById(refs.agent_v2_artifacts, payload);
