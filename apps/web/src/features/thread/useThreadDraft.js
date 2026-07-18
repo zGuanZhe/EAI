@@ -16,6 +16,10 @@ function restoredAttachment(ref) {
   return { id: ref.id, type: "context_card", title: "已恢复上下文", source_ref: { context_card_id: ref.id } };
 }
 
+function interactionMode(value) {
+  return value === "research" || value === "deep_research" ? "research" : "ask";
+}
+
 export function useThreadDraft({ threadId, text, setText, agentMode, setAgentMode, attachments, replaceAttachments, enabled = true }) {
   const [conflict, setConflict] = useState(null);
   const revisionRef = useRef(0);
@@ -30,14 +34,14 @@ export function useThreadDraft({ threadId, text, setText, agentMode, setAgentMod
     loadedThreadRef.current = "";
     revisionRef.current = 0;
     setText("");
-    setAgentMode("auto");
+    setAgentMode("ask");
     replaceAttachments([]);
     api(`/threads/${threadId}/draft`).then(({ draft }) => {
       if (!active) return;
       revisionRef.current = draft?.revision || 0;
       if (draft) {
         setText(draft.text || "");
-        setAgentMode(draft.agent_mode || "auto");
+        setAgentMode(interactionMode(draft.agent_mode));
         replaceAttachments((draft.attachment_refs || []).map(restoredAttachment));
       }
       loadedThreadRef.current = threadId;
@@ -51,7 +55,7 @@ export function useThreadDraft({ threadId, text, setText, agentMode, setAgentMod
     if (!threadId || !enabled || loadedThreadRef.current !== threadId) return revisionRef.current;
     const current = stateRef.current;
     const attachmentRefs = current.attachments.map(referenceForAttachment).filter(Boolean).slice(0, 8);
-    if (!revisionRef.current && !current.text.trim() && current.agentMode === "auto" && !attachmentRefs.length) return 0;
+    if (!revisionRef.current && !current.text.trim() && current.agentMode === "ask" && !attachmentRefs.length) return 0;
     try {
       const saved = await api(`/threads/${threadId}/draft`, {
         method: "PUT",
@@ -104,7 +108,7 @@ export function useThreadDraft({ threadId, text, setText, agentMode, setAgentMod
     if (!remote) return;
     revisionRef.current = remote.revision;
     setText(remote.text || "");
-    setAgentMode(remote.agent_mode || "auto");
+    setAgentMode(interactionMode(remote.agent_mode));
     replaceAttachments((remote.attachment_refs || []).map(restoredAttachment));
     setConflict(null);
   }, [conflict, replaceAttachments, setAgentMode, setText]);

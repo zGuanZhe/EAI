@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sqlite3
 import threading
 from pathlib import Path
@@ -19,6 +20,9 @@ from .models import (
     SourceRecord,
     ToolCall,
 )
+
+
+SUPPORTED_RUNTIME_SCHEMA = 2
 
 
 class RuntimeStore:
@@ -43,7 +47,17 @@ class RuntimeStore:
             self.workspaces_dir.mkdir(parents=True, exist_ok=True)
         self.db_path = self.runtime_dir / "runtime.db"
         self._lock = threading.RLock()
+        self.runtime_schema_version = self._read_runtime_schema(self.db_path)
+        self.supported_runtime_schema = SUPPORTED_RUNTIME_SCHEMA
+        if self.runtime_schema_version > self.supported_runtime_schema:
+            self.read_only = True
         if read_only and self.db_path.exists():
+            self._connection = sqlite3.connect(
+                f"{self.db_path.resolve().as_uri()}?mode=ro",
+                uri=True,
+                check_same_thread=False,
+            )
+        elif self.read_only and self.db_path.exists():
             self._connection = sqlite3.connect(
                 f"{self.db_path.resolve().as_uri()}?mode=ro",
                 uri=True,
@@ -52,8 +66,46 @@ class RuntimeStore:
         else:
             self._connection = sqlite3.connect(":memory:" if read_only else self.db_path, check_same_thread=False)
         self._connection.row_factory = sqlite3.Row
-        if not read_only or not self.db_path.exists():
-            self._initialize()
+        if not self.read_only or not self.db_path.exists():
+            migration_backup = None
+            if self.db_path.exists() and self.runtime_schema_version < self.supported_runtime_schema:
+                migration_backup = self._backup_before_upgrade()
+            try:
+                self._initialize()
+            except Exception:
+                self._connection.close()
+                if migration_backup and migration_backup.exists():
+                    shutil.copy2(migration_backup, self.db_path)
+                raise
+
+    @staticmethod
+    def _read_runtime_schema(path: Path) -> int:
+        if not path.exists():
+            return 0
+        connection = sqlite3.connect(path)
+        try:
+            table = connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='runtime_meta'"
+            ).fetchone()
+            if not table:
+                return 1
+            row = connection.execute("SELECT value FROM runtime_meta WHERE key='schema_version'").fetchone()
+            return int(row[0]) if row else 1
+        finally:
+            connection.close()
+
+    def _backup_before_upgrade(self) -> Path | None:
+        if self.runtime_schema_version <= 0:
+            return None
+        target = self.runtime_dir / f"runtime.schema-{self.runtime_schema_version}.backup.db"
+        if target.exists():
+            return target
+        backup = sqlite3.connect(target)
+        try:
+            self._connection.backup(backup)
+        finally:
+            backup.close()
+        return target
 
     def ensure_writable(self) -> None:
         if self.read_only:
@@ -68,6 +120,10 @@ class RuntimeStore:
                 """
                 PRAGMA journal_mode=WAL;
                 PRAGMA foreign_keys=ON;
+                CREATE TABLE IF NOT EXISTS runtime_meta (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS agent_tasks (
                     id TEXT PRIMARY KEY,
                     thread_id TEXT NOT NULL,
@@ -229,8 +285,39 @@ class RuntimeStore:
                     created_at TEXT NOT NULL,
                     PRIMARY KEY(campaign_id, seq)
                 );
+                CREATE TABLE IF NOT EXISTS context_manifests (
+                    id TEXT PRIMARY KEY,
+                    task_id TEXT NOT NULL,
+                    thread_id TEXT NOT NULL,
+                    payload TEXT NOT NULL,
+                    content_hash TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_context_manifests_task ON context_manifests(task_id, created_at);
+                CREATE TABLE IF NOT EXISTS research_checkpoints (
+                    task_id TEXT NOT NULL,
+                    sequence INTEGER NOT NULL,
+                    phase TEXT NOT NULL,
+                    payload TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY(task_id, sequence)
+                );
+                CREATE TABLE IF NOT EXISTS ui_commands (
+                    id TEXT PRIMARY KEY,
+                    task_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    payload TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    resolved_at TEXT
+                );
                 """
             )
+            self._connection.execute(
+                "INSERT INTO runtime_meta(key, value) VALUES('schema_version', ?) "
+                "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                (str(SUPPORTED_RUNTIME_SCHEMA),),
+            )
+            self.runtime_schema_version = SUPPORTED_RUNTIME_SCHEMA
             self._connection.execute(
                 """INSERT OR IGNORE INTO task_sources(task_id, source_id, linked_at)
                    SELECT task_id, id, created_at FROM sources WHERE task_id IS NOT NULL AND task_id != ''"""
@@ -239,6 +326,107 @@ class RuntimeStore:
     def close(self) -> None:
         with self._lock:
             self._connection.close()
+
+    def save_context_manifest(self, manifest: dict[str, Any]) -> dict[str, Any]:
+        self.ensure_writable()
+        with self._lock, self._connection:
+            self._connection.execute(
+                """INSERT INTO context_manifests(id, task_id, thread_id, payload, content_hash, created_at)
+                   VALUES(?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(id) DO UPDATE SET payload=excluded.payload, content_hash=excluded.content_hash""",
+                (
+                    manifest["id"], manifest["task_id"], manifest["thread_id"],
+                    json.dumps(manifest, ensure_ascii=False), manifest["content_hash"], manifest["created_at"],
+                ),
+            )
+        return manifest
+
+    def get_context_manifest(self, manifest_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT payload FROM context_manifests WHERE id=?", (manifest_id,)
+            ).fetchone()
+        return json.loads(row["payload"]) if row else None
+
+    def save_research_checkpoint(
+        self, task_id: str, phase: str, payload: dict[str, Any], created_at: str
+    ) -> dict[str, Any]:
+        self.ensure_writable()
+        with self._lock, self._connection:
+            row = self._connection.execute(
+                "SELECT COALESCE(MAX(sequence), 0) + 1 AS sequence FROM research_checkpoints WHERE task_id=?",
+                (task_id,),
+            ).fetchone()
+            sequence = int(row["sequence"])
+            value = {"task_id": task_id, "sequence": sequence, "phase": phase, "payload": payload, "created_at": created_at}
+            self._connection.execute(
+                "INSERT INTO research_checkpoints(task_id, sequence, phase, payload, created_at) VALUES(?, ?, ?, ?, ?)",
+                (task_id, sequence, phase, json.dumps(value, ensure_ascii=False), created_at),
+            )
+        return value
+
+    def list_research_checkpoints(self, task_id: str) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT payload FROM research_checkpoints WHERE task_id=? ORDER BY sequence", (task_id,)
+            ).fetchall()
+        return [json.loads(row["payload"]) for row in rows]
+
+    def save_ui_command(self, command: dict[str, Any]) -> dict[str, Any]:
+        self.ensure_writable()
+        with self._lock, self._connection:
+            self._connection.execute(
+                """INSERT INTO ui_commands(id, task_id, status, payload, created_at, resolved_at)
+                   VALUES(?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(id) DO UPDATE SET status=excluded.status,
+                     payload=excluded.payload, resolved_at=excluded.resolved_at""",
+                (
+                    command["id"], command["task_id"], command["status"],
+                    json.dumps(command, ensure_ascii=False), command["created_at"], command.get("resolved_at"),
+                ),
+            )
+        return command
+
+    def get_ui_command(self, command_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT payload FROM ui_commands WHERE id=?", (command_id,)
+            ).fetchone()
+        return json.loads(row["payload"]) if row else None
+
+    def list_ui_commands(self, task_id: str, *, status: str | None = None) -> list[dict[str, Any]]:
+        query = "SELECT payload FROM ui_commands WHERE task_id=?"
+        values: list[Any] = [task_id]
+        if status:
+            query += " AND status=?"
+            values.append(status)
+        query += " ORDER BY created_at, id"
+        with self._lock:
+            rows = self._connection.execute(query, values).fetchall()
+        return [json.loads(row["payload"]) for row in rows]
+
+    def resolve_ui_command(self, command_id: str, status: str, resolved_at: str) -> dict[str, Any]:
+        self.ensure_writable()
+        if status not in {"applied", "dismissed"}:
+            raise ValueError("invalid UI command resolution")
+        with self._lock, self._connection:
+            row = self._connection.execute(
+                "SELECT payload FROM ui_commands WHERE id=?", (command_id,)
+            ).fetchone()
+            if not row:
+                raise KeyError("UI command not found")
+            command = json.loads(row["payload"])
+            if command.get("status") == status:
+                return command
+            if command.get("status") != "pending":
+                raise ValueError("UI command is already resolved")
+            command["status"] = status
+            command["resolved_at"] = resolved_at
+            self._connection.execute(
+                "UPDATE ui_commands SET status=?, payload=?, resolved_at=? WHERE id=?",
+                (status, json.dumps(command, ensure_ascii=False), resolved_at, command_id),
+            )
+        return command
 
     def save_campaign_checkpoint(
         self, campaign_id: str, thread_id: str, status: str, payload: dict[str, Any], updated_at: str

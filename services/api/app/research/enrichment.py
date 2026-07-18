@@ -24,7 +24,7 @@ class KnowledgeEnrichmentService:
         self.client_factory = client_factory or (
             lambda: httpx.Client(
                 timeout=httpx.Timeout(30, connect=8), follow_redirects=True,
-                headers={"User-Agent": "EAI-Desktop/0.2 knowledge-enrichment"},
+                headers={"User-Agent": "EAI-Desktop/1.0 knowledge-enrichment"},
             )
         )
         self._workers: dict[str, threading.Thread] = {}

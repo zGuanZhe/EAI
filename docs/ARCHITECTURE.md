@@ -20,7 +20,7 @@ Research Store 分为 `curated / derived / personal` 三层。字段解析顺序
 desktop -> process/path/credential management
 web -> API client -> feature queries -> workspace UI state
 api routers -> services -> repositories -> core storage
-agent-v2 graph -> service router -> source/capability registry -> repositories
+agent-v3 lanes -> agent-v2 compatibility graph -> capability registry -> repositories
 ```
 
 模型没有直接写工具。旧回合继续读取 AgentRun v1 与 ChangeSet；新回合写入 Agent Runtime v2 task/event，并通过 OperationBatch 完成确认、冲突检查、事务写入和安全撤销。
@@ -30,6 +30,18 @@ agent-v2 graph -> service router -> source/capability registry -> repositories
 `application.py` 只承担默认配置、lifespan 组装、router 注册和兼容适配导出，不包含路由装饰器、Provider 协议或领域写入。Workspace、Draft、System、Atlas/Object Memory、Thread Content、Change Review、Task Pack、Research、Campaign、Agent v2 和 Legacy Read 均通过独立 router/service 边界注册。架构门禁用 AST 检查 router/service/repository 依赖方向、legacy 反向依赖、导入副作用和领域可变全局状态；文件行数只用于辅助报警。
 
 ChangeSet 与 OperationBatch 共用 Research Store 的 canonical batch executor。执行器先校验所有 expected payload，再在一个 SQLite transaction 中写入全部权威记录和对应 `projection_journal`；任一预检或写入失败时 SQLite 零写入。提交后 projector 独立重放 JSON，投影失败只保留 pending/failed journal，不撤销权威提交。若 OperationBatch 在 research commit 后、runtime receipt 前中断，重试通过线程中的 canonical `operation_batch_id` marker 对账，禁止重复应用；`research.db`、`runtime.db` 与 JSON 之间不宣称原子事务。
+
+## Agent v3
+
+Agent v3 提供两个独立 lane。AskTurn 对信息型问题执行一次有界并行检索，对闲聊、改写、翻译和创作保持零检索；ResearchTask 使用 `scope -> search_map -> gather -> read -> compare -> synthesize -> guard -> report` checkpoint，并支持定向 steer、pause、resume、cancel 与显式 Campaign promotion。同一线程最多一个活跃 AskTurn 和一个活跃 ResearchTask，研究 lane 不占用询问 lane。
+
+`ContextManifest` 按显式附件、焦点对象、线程资料、项目/对象记忆、Atlas 和外部来源的优先级记录 revision、source layer、trust 与 content hash。线程目标、最近消息和非敏感页面状态只是理解上下文，`evidence_eligible=false`；只有注册 capability 生成的 `SourceRecord/EvidenceChunk` 才能引用。SourcePolicy 在 routing、capability filter、Prompt broker 和 Evidence Guard 四层执行，未知值由 Pydantic 返回 `422` 且零联网。
+
+通用网页能力由独立 `WebSearchProvider` 提供 SearXNG、Brave 和 Tavily adapter。`web.read` 只接受无凭据 HTTPS 公网 URL，逐跳重新验证 DNS/IP 与重定向，限制内容类型、超时和解压后 2 MB 正文；连接器状态查询不联网，显式检查动作才执行健康探测。密钥只从桌面凭据管理器注入 sidecar，不进入状态、日志或 API 响应。
+
+能力注册表是权限真相。读取自动执行；`UICommand` 只允许前端白名单页面映射并保存 applied/dismissed receipt；项目、线程、Context、Canvas、对象记忆和候选论文等持久操作走 OperationBatch；Campaign 执行和阶段跃迁保留独立审批。模型永远不能获得 SQL、密钥、原始 Provider body、任意路径、DOM 或宿主命令。
+
+Runtime schema 2 保存 ContextManifest、Research checkpoint 和 UICommand。启动迁移前分别在线备份 `research.db` 与 `runtime.db`；runtime 初始化失败会恢复 runtime 备份。任一数据库 schema 高于应用支持版本时，Research Store、Runtime、Workspace、Campaign 与 Agent 写边界整体只读，读取与安全预览继续可用。
 
 ## Agent Runtime v2.1
 

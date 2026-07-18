@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shutil
 from copy import deepcopy
 from typing import Any
@@ -61,6 +62,8 @@ WORKSPACE = ["workspace_operation", "synthesis", "research_campaign"]
 CAPABILITY_REGISTRY: dict[str, CapabilitySpec] = {
     item.id: item
     for item in [
+        spec("project.create", "创建项目", "创建带明确目标的研究项目。", ["workspace_operation"], "write", object_schema({"id": STRING, "title": STRING, "goal": STRING, "default_atlas_id": STRING}, ["title", "goal"]), risk="medium", approval="confirm", scopes=["project"], reversible=True),
+        spec("thread.create", "创建线程", "在项目内创建独立研究问题线程。", ["workspace_operation"], "write", object_schema({"id": STRING, "project_id": STRING, "title": STRING, "goal": STRING, "active_atlas_id": STRING}, ["title", "goal"]), risk="medium", approval="confirm", scopes=["thread"], reversible=True),
         spec("workspace.snapshot", "读取工作区摘要", "读取当前项目、线程、焦点和安全摘要。", ["conversation", *WORKSPACE], "read", object_schema(), scopes=["project", "thread"]),
         spec("context.list", "读取线程资料", "按需读取本轮附件与长期资料。", [*RESEARCH, "workspace_operation"], "read", object_schema({"limit": {"type": "integer", "minimum": 1, "maximum": 24}}), scopes=["thread.context"]),
         spec("knowledge.search", "检索研究知识库", "检索 Atlas、全文、Claim、EvidenceSpan 和研究状态。", RESEARCH, "read", object_schema({"query": STRING, "limit": {"type": "integer", "minimum": 1, "maximum": 30}}, ["query"]), scopes=["knowledge"]),
@@ -73,6 +76,8 @@ CAPABILITY_REGISTRY: dict[str, CapabilitySpec] = {
         spec("knowledge.research_state", "读取研究状态", "读取问题、假设、判断、Campaign 和下一步任务。", ["conversation", *WORKSPACE], "read", object_schema(), scopes=["knowledge.state"]),
         spec("knowledge.inspect_gaps", "检查证据缺口", "识别缺失全文、关系理由和实验支撑。", RESEARCH, "read", object_schema({"work_ids": STRING_LIST}), scopes=["knowledge.quality"]),
         spec("sources.search_external", "检索外部学术源", "检索 OpenAlex、arXiv 和 Crossref。", RESEARCH, "read", object_schema({"query": STRING, "providers": STRING_LIST, "limit": {"type": "integer", "minimum": 1, "maximum": 30}}, ["query"]), scopes=["network.academic"], timeout_seconds=45, budget_cost=2),
+        spec("web.search", "搜索通用网页", "通过已配置的网页连接器查找公开网页。", RESEARCH, "read", object_schema({"query": STRING, "limit": {"type": "integer", "minimum": 1, "maximum": 12}}, ["query"]), scopes=["network.web"], timeout_seconds=20, budget_cost=2),
+        spec("web.read", "读取公开网页", "读取经过网络边界校验的公开 HTTPS 网页正文。", RESEARCH, "read", object_schema({"url": STRING}, ["url"]), scopes=["network.web"], timeout_seconds=20, budget_cost=2),
         spec("documents.search", "检索本地全文", "检索已导入 PDF、笔记和文本片段。", RESEARCH, "read", object_schema({"query": STRING, "limit": {"type": "integer", "minimum": 1, "maximum": 20}}, ["query"]), scopes=["documents"]),
         spec("documents.import_open", "获取开放全文", "从可信学术域名获取并索引开放 PDF。", ["evidence_research", "document_reading", "research_campaign"], "temporary", object_schema({"source_id": STRING}, ["source_id"]), scopes=["documents", "network.academic"], timeout_seconds=90, budget_cost=3),
         spec("campaign.inspect", "检查研究 Campaign", "读取阶段、分支、指标、稿件和审稿状态。", ["research_campaign", "synthesis", "workspace_operation"], "read", object_schema({"campaign_id": STRING}, ["campaign_id"]), scopes=["research_campaign"]),
@@ -99,6 +104,15 @@ def capability_specs(*, service: ServiceType | None = None, include_write: bool 
         if item.id == "sandbox.command" and not docker_available:
             item.available = False
             item.unavailable_reason = "Docker 不可用，只能生成命令预览。"
+    web_provider = os.environ.get("EAI_WEB_SEARCH_PROVIDER", "").strip().lower()
+    web_available = bool(
+        (web_provider == "searxng" and os.environ.get("EAI_WEB_SEARCH_BASE_URL", "").strip())
+        or (web_provider in {"brave", "tavily"} and os.environ.get("EAI_WEB_SEARCH_API_KEY", "").strip())
+    )
+    for item in specs:
+        if item.id in {"web.search", "web.read"} and not web_available:
+            item.available = False
+            item.unavailable_reason = "通用网页搜索未配置。"
     return [
         item for item in specs
         if (service is None or service in item.services) and (include_write or item.permission in {"read", "temporary"})

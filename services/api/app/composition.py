@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException
 
 from .agent_v2.models import ApprovalResolveRequest, OperationBatch
 from .agent_v2.runtime import AgentRuntimeV2, RuntimeDependencies
-from .agent_v2.store import RuntimeStore
+from .agent_v2.store import SUPPORTED_RUNTIME_SCHEMA, RuntimeStore
 from .campaign.router import create_campaign_router
 from .campaign.service import CampaignService
 from .core.config import ApplicationConfig
@@ -18,6 +18,7 @@ from .research.page_preview import PagePreviewService
 from .research.router import create_research_router
 from .research.store import ResearchStore
 from .routers.agent_v2 import create_agent_v2_router
+from .routers.agent_v3 import create_agent_v3_router
 from .routers.atlas import create_atlas_router
 from .routers.change_review import create_change_review_router
 from .routers.drafts import create_draft_router
@@ -27,6 +28,7 @@ from .routers.task_pack import create_task_pack_router
 from .routers.thread_content import create_thread_content_router
 from .routers.workspace import create_workspace_router
 from .services.agent_api import AgentApiService
+from .services.agent_v3 import AgentV3Service
 from .services.agent_domain import AgentDomainService
 from .services.agent_operations import AgentOperationError, AgentOperationService
 from .services.atlas import AtlasService
@@ -58,10 +60,14 @@ class ApplicationAssembly:
             directory.mkdir(parents=True, exist_ok=True)
 
     def research_store(self) -> ResearchStore:
+        runtime_schema = RuntimeStore._read_runtime_schema(self.config.runtime_dir / "runtime.db")
+        runtime_newer = runtime_schema > SUPPORTED_RUNTIME_SCHEMA
         return self.services.research_store(
             (self.paths.personal_dir.parent / "research").resolve(),
             self.paths.atlas_cache_dir,
             self.paths.personal_dir,
+            force_read_only=runtime_newer,
+            read_only_reason="runtime_schema_newer_than_app" if runtime_newer else "",
         )
 
     def workspace(self) -> WorkspaceService:
@@ -147,6 +153,9 @@ class ApplicationAssembly:
         store = self.research_store()
 
         def factory() -> AgentRuntimeV2:
+            runtime_schema = RuntimeStore._read_runtime_schema(self.config.runtime_dir / "runtime.db")
+            if 0 < runtime_schema < SUPPORTED_RUNTIME_SCHEMA and not store.read_only:
+                store.backup_database(f"runtime-v{runtime_schema}-to-v{SUPPORTED_RUNTIME_SCHEMA}")
             runtime_store = RuntimeStore(
                 self.config.runtime_dir,
                 read_only=store.read_only,
@@ -195,6 +204,12 @@ class ApplicationAssembly:
             thread_lock=self.services.agent_thread_lock,
         ))
 
+    def agent_v3(self) -> AgentV3Service:
+        runtime = self.agent_runtime()
+        return self.services.agent_v3(runtime, lambda: AgentV3Service(
+            self.agent_api(), load_full_context=self.agent_domain().load_full_context,
+        ))
+
     def enrichment(self) -> KnowledgeEnrichmentService:
         store = self.research_store()
         return self.services.enrichment(
@@ -215,7 +230,9 @@ class ApplicationAssembly:
     def _create_app(self) -> FastAPI:
         @asynccontextmanager
         async def lifespan(_app):
-            self.ensure_dirs()
+            runtime_newer = RuntimeStore._read_runtime_schema(self.config.runtime_dir / "runtime.db") > SUPPORTED_RUNTIME_SCHEMA
+            if not runtime_newer:
+                self.ensure_dirs()
             if not self.research_store().read_only:
                 self.services.projection(self.research_store()).replay(limit=500)
                 self.agent_runtime()
@@ -244,6 +261,7 @@ class ApplicationAssembly:
         app.include_router(create_research_router(self.research_store, self.enrichment, self.page_preview))
         app.include_router(create_campaign_router(self.campaign))
         app.include_router(create_agent_v2_router(self.agent_api))
+        app.include_router(create_agent_v3_router(self.agent_v3))
         app.include_router(create_legacy_router(self.legacy_read))
         return app
 

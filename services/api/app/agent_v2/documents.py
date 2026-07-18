@@ -113,7 +113,7 @@ def import_open_source(
     host = (parsed.hostname or "").lower()
     if parsed.scheme != "https" or host not in allowed_hosts:
         raise ValueError("该开放全文域名未列入可信下载列表。")
-    factory = client_factory or (lambda: httpx.Client(timeout=httpx.Timeout(90, connect=8), follow_redirects=True, headers={"User-Agent": "EAI-Desktop/0.2"}))
+    factory = client_factory or (lambda: httpx.Client(timeout=httpx.Timeout(90, connect=8), follow_redirects=True, headers={"User-Agent": "EAI-Desktop/1.0"}))
     content = bytearray()
     with factory() as client:
         with client.stream("GET", url) as response:

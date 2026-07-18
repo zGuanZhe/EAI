@@ -59,7 +59,7 @@ class LocalEmbeddingProfile:
                 continue
             partial = target.with_suffix(target.suffix + ".part")
             request = urllib.request.Request(
-                f"{BASE_URL}/{remote_name}", headers={"User-Agent": "EAI-Desktop/0.2 embedding-profile"}
+                f"{BASE_URL}/{remote_name}", headers={"User-Agent": "EAI-Desktop/1.0 embedding-profile"}
             )
             digest = hashlib.sha256()
             total = 0

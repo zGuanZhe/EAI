@@ -43,11 +43,45 @@ class VNextServiceTest(unittest.TestCase):
         schema = json.loads(json.dumps(main.app.openapi()))
         schema.get("info", {}).pop("version", None)
         serialized = json.dumps(schema, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-        self.assertEqual(len(schema["paths"]), 107)
-        self.assertEqual(sum(len(operations) for operations in schema["paths"].values()), 116)
+        agent_v3_paths = {
+            "/api/vnext/agent/capabilities",
+            "/api/vnext/agent/tasks/{task_id}/ui-commands",
+            "/api/vnext/agent/ui-commands/{command_id}/resolve",
+            "/api/vnext/research-tasks/{task_id}",
+            "/api/vnext/research-tasks/{task_id}/cancel",
+            "/api/vnext/research-tasks/{task_id}/events",
+            "/api/vnext/research-tasks/{task_id}/pause",
+            "/api/vnext/research-tasks/{task_id}/promote-campaign",
+            "/api/vnext/research-tasks/{task_id}/resume",
+            "/api/vnext/research-tasks/{task_id}/steer",
+            "/api/vnext/search-connectors/status",
+            "/api/vnext/search-connectors/{connector_id}/check",
+            "/api/vnext/threads/{thread_id}/agent-context/preview",
+            "/api/vnext/threads/{thread_id}/agent/asks",
+            "/api/vnext/threads/{thread_id}/research-tasks",
+        }
+        self.assertTrue(agent_v3_paths.issubset(schema["paths"]))
+        legacy_operations = {
+            path: sorted(method for method in operations if method in {
+                "get", "post", "put", "delete", "patch", "options", "head",
+            })
+            for path, operations in schema["paths"].items()
+            if path not in agent_v3_paths
+        }
+        legacy_serialized = json.dumps(
+            legacy_operations, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        )
+        self.assertEqual(len(legacy_operations), 107)
+        self.assertEqual(sum(len(operations) for operations in legacy_operations.values()), 116)
+        self.assertEqual(
+            hashlib.sha256(legacy_serialized.encode("utf-8")).hexdigest(),
+            "e6395d9c1486b2a37d4ed6c04c84a38ac61656a3a59e202cb540dda23730144e",
+        )
+        self.assertEqual(len(schema["paths"]), 122)
+        self.assertEqual(sum(len(operations) for operations in schema["paths"].values()), 132)
         self.assertEqual(
             hashlib.sha256(serialized.encode("utf-8")).hexdigest(),
-            "d5ddb8afd8dc8b784f64c52cfaee0b026d661bf5b9d5de5ac21dff667e5d1f3a",
+            "1c4e552e0ba33a094e722c8c75bca9f1503a97f027600b0c487cf91e773e1dba",
         )
 
     def test_application_factory_uses_isolated_immutable_config(self):
@@ -203,6 +237,81 @@ class VNextServiceTest(unittest.TestCase):
                     self.assertIsInstance(detail, dict, f"{name}: {response.text}")
                     self.assertEqual(detail["code"], "schema_newer_than_app")
 
+                main.reset_app_services()
+                self.assertEqual(research_db.read_bytes(), research_before)
+                self.assertEqual(runtime_db.read_bytes(), runtime_before)
+            finally:
+                main.reset_app_services()
+                for name, value in original.items():
+                    setattr(main, name, value)
+
+    def test_newer_runtime_schema_forces_whole_application_read_only(self):
+        original = {
+            "PERSONAL_DIR": main.PERSONAL_DIR,
+            "THREADS_DIR": main.THREADS_DIR,
+            "BACKUPS_DIR": main.BACKUPS_DIR,
+            "PROJECTS_DIR": main.PROJECTS_DIR,
+            "OBJECTS_DIR": main.OBJECTS_DIR,
+            "ATLAS_UPDATES_DIR": main.ATLAS_UPDATES_DIR,
+            "LAB_RUNS_DIR": main.LAB_RUNS_DIR,
+            "RUNTIME_V2_DIR": main.RUNTIME_V2_DIR,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            personal = root / "personal"
+            try:
+                main.PERSONAL_DIR = personal
+                main.THREADS_DIR = personal / "threads"
+                main.BACKUPS_DIR = personal / "backups"
+                main.PROJECTS_DIR = personal / "projects"
+                main.OBJECTS_DIR = personal / "objects"
+                main.ATLAS_UPDATES_DIR = personal / "atlas_updates"
+                main.LAB_RUNS_DIR = personal / "lab_runs"
+                main.RUNTIME_V2_DIR = root / "runtime"
+                main.reset_app_services()
+                main.ensure_dirs()
+                client = TestClient(main.app)
+                thread = client.post(
+                    "/api/vnext/threads",
+                    json={"title": "Runtime bridge thread", "active_atlas_id": "I"},
+                ).json()
+                main.get_agent_v2_runtime()
+                main.reset_app_services()
+
+                research_db = root / "research" / "research.db"
+                runtime_db = root / "runtime" / "runtime.db"
+                connection = sqlite3.connect(runtime_db)
+                connection.execute(
+                    "UPDATE runtime_meta SET value='3' WHERE key='schema_version'"
+                )
+                connection.commit()
+                connection.close()
+                research_before = research_db.read_bytes()
+                runtime_before = runtime_db.read_bytes()
+
+                read_only_client = TestClient(main.app)
+                info = read_only_client.get("/api/vnext/system/info")
+                self.assertEqual(info.status_code, 200, info.text)
+                self.assertTrue(info.json()["research_store"]["read_only"])
+                self.assertEqual(
+                    info.json()["research_store"]["reason"],
+                    "runtime_schema_newer_than_app",
+                )
+                loaded = read_only_client.get(f"/api/vnext/threads/{thread['id']}")
+                self.assertEqual(loaded.status_code, 200, loaded.text)
+                blocked = [
+                    read_only_client.put(
+                        f"/api/vnext/threads/{thread['id']}",
+                        json={"title": "Blocked", "expected_revision": thread["revision"]},
+                    ),
+                    read_only_client.post(
+                        f"/api/vnext/threads/{thread['id']}/agent/asks",
+                        json={"message": "This must not start"},
+                    ),
+                ]
+                for response in blocked:
+                    self.assertEqual(response.status_code, 409, response.text)
+                    self.assertEqual(response.json()["detail"]["code"], "schema_newer_than_app")
                 main.reset_app_services()
                 self.assertEqual(research_db.read_bytes(), research_before)
                 self.assertEqual(runtime_db.read_bytes(), runtime_before)

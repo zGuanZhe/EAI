@@ -162,6 +162,55 @@ def route_turn(
     *,
     thread_context: dict[str, Any] | None = None,
 ) -> ServiceDecision:
+    if request.surface == "agent-v3:ask-operation":
+        return ServiceDecision(
+            service="workspace_operation",
+            objective=_clean_text(request.message),
+            depth="standard",
+            source_policy=request.source_policy or "local_only",
+            requested_outputs=["operation_preview"],
+            confidence=1,
+            reason="用户明确要求修改 EAI 工作区，必须先形成待确认预览。",
+        )
+    if request.surface == "agent-v3:ask-execution":
+        return ServiceDecision(
+            service="sandbox_execution",
+            objective=_clean_text(request.message),
+            depth="standard",
+            source_policy=request.source_policy or "local_only",
+            requested_outputs=["command_output"],
+            confidence=1,
+            reason="用户明确要求受限执行，必须先形成待批准预览。",
+        )
+    if request.surface == "agent-v3:ask-campaign":
+        return ServiceDecision(
+            service="research_campaign",
+            objective=_clean_text(request.message),
+            depth="standard",
+            source_policy=request.source_policy or "local_and_external",
+            requested_outputs=["campaign_state"],
+            confidence=1,
+            reason="用户明确要求控制或创建研究 Campaign。",
+        )
+    if request.surface == "agent-v3:ask-search":
+        return ServiceDecision(
+            service="evidence_research",
+            objective=_clean_text(request.message),
+            depth="quick",
+            source_policy=request.source_policy or "local_and_external",
+            requested_outputs=["evidence_set"],
+            confidence=1,
+            reason="信息型询问默认执行有界快速检索。",
+        )
+    if request.surface == "agent-v3:ask-chat":
+        return ServiceDecision(
+            service="conversation",
+            objective=_clean_text(request.message),
+            depth="quick",
+            source_policy="none",
+            confidence=1,
+            reason="本轮是闲聊或文本变换。",
+        )
     if request.intent_override != "auto":
         return fallback_service_decision(request)
     if model_router:

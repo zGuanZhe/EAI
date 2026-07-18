@@ -15,6 +15,7 @@ from urllib.parse import quote_plus
 
 import httpx
 
+from ..agent_v3.web import WebSearchProvider
 from .models import SourceRecord
 from .store import RuntimeStore
 
@@ -84,7 +85,8 @@ class SourceService:
     ):
         self.store = store
         self.atlas_loader = atlas_loader
-        self.client_factory = client_factory or (lambda: httpx.Client(timeout=httpx.Timeout(12, connect=5), follow_redirects=True, headers={"User-Agent": "EAI-Desktop/0.2 research-agent"}))
+        self.client_factory = client_factory or (lambda: httpx.Client(timeout=httpx.Timeout(12, connect=5), follow_redirects=True, headers={"User-Agent": "EAI-Desktop/1.0 research-agent"}))
+        self.web = WebSearchProvider(client_factory=client_factory) if client_factory else WebSearchProvider()
 
     def _persist(self, task_id: str | None, source: SourceRecord) -> SourceRecord:
         source.task_id = task_id
@@ -374,6 +376,28 @@ class SourceService:
                 utc_now(),
             )
         return deduped, warnings
+
+    def search_web(self, query: str, task_id: str | None, limit: int = 8) -> list[SourceRecord]:
+        results: list[SourceRecord] = []
+        for item in self.web.search(query, limit):
+            canonical = f"web:{item['url']}"
+            results.append(self._persist(task_id, SourceRecord(
+                id=source_id(canonical), task_id=task_id, source_kind="web", evidence_level="metadata",
+                title=item["title"], locator={"url": item["url"]}, excerpt=item["excerpt"],
+                canonical_key=canonical, content_hash=content_hash(item["title"], item["excerpt"], item["url"]),
+                retrieved_at=utc_now(), confidence=0.7, access="open", provider=self.web.settings.provider,
+            )))
+        return self.deduplicate(results)
+
+    def read_web(self, url: str, task_id: str | None) -> SourceRecord:
+        page = self.web.read(url)
+        canonical = f"web:{page['url']}"
+        return self._persist(task_id, SourceRecord(
+            id=source_id(f"{canonical}:{page['content_hash']}"), task_id=task_id, source_kind="web",
+            evidence_level="web_content", title=page["url"], locator={"url": page["url"]},
+            excerpt=page["text"][:1800], canonical_key=canonical, content_hash=page["content_hash"],
+            retrieved_at=utc_now(), confidence=0.72, access="open", provider=self.web.settings.provider,
+        ))
 
     def deduplicate(self, sources: list[SourceRecord]) -> list[SourceRecord]:
         ranked = {"full_text": 7, "abstract": 6, "web_content": 5, "curated_summary": 4, "metadata": 3, "user_knowledge": 2, "system_truth": 1}

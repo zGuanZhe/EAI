@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Layers, Paperclip, Send, Square, X } from "lucide-react";
+import { ChevronDown, FlaskConical, Layers, MessageCircle, Paperclip, Search, Send, Square, X } from "lucide-react";
 import { COMPOSER_COPY } from "./copy/zh.js";
 
 function cx(...parts) {
@@ -20,8 +20,14 @@ export function Composer({
   onStop,
   attachments = [],
   onRemoveAttachment,
-  intentMode = "auto",
-  onIntentModeChange,
+  interactionMode = "ask",
+  onInteractionModeChange,
+  sourcePolicy = "local_and_external",
+  onSourcePolicyChange,
+  researchDeliverable = "research_note",
+  onResearchDeliverableChange,
+  researchDepth = "standard",
+  onResearchDepthChange,
   readOnly = false
 }) {
   const commandQuery = value.startsWith("/") ? value.trim().toLowerCase() : "";
@@ -37,6 +43,16 @@ export function Composer({
   const showCommandPanel = toolOpen || (value.startsWith("/") && commandQuery !== dismissedCommand);
   const [activeIndex, setActiveIndex] = useState(0);
   const textareaRef = useRef(null);
+  const sourceSummary = {
+    none: "不检索",
+    atlas_only: "Atlas",
+    local_only: "本地与 Atlas",
+    external_only: "学术与已配置网页",
+    local_and_external: "本地、Atlas、学术与已配置网页"
+  }[sourcePolicy] || "未知来源范围";
+  const mayWrite = /(?:创建|更新|修改|删除|保存|记住|加入|create|update|delete|save|remember)/i.test(value);
+  const contextSummary = attachments.length ? `本线程 + ${attachments.length} 项本轮资料` : "本线程";
+  const boundarySummary = interactionMode === "research" || !mayWrite ? "不修改工作区" : "修改前需确认";
 
   useEffect(() => {
     setActiveIndex(0);
@@ -153,25 +169,66 @@ export function Composer({
           value={value}
           onChange={(event) => setValue(event.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={readOnly ? "当前版本以只读模式打开此研究数据库" : isRunning ? "追加要求或纠正方向..." : intentMode === "execute" ? "描述要在沙箱中执行的任务，命令会逐次请求确认..." : COMPOSER_COPY.placeholder}
+          placeholder={readOnly ? "当前数据以只读模式打开" : isRunning ? "追加要求或纠正方向..." : interactionMode === "research" ? "描述研究目标、判断标准或期望产物..." : "询问问题；信息型问题会默认检索可用来源..."}
           rows={1}
           disabled={readOnly}
         />
-        <label className="composer-mode-select" title="选择 Main Agent 本轮工作方式">
-          <span className="sr-only">本轮工作方式</span>
-          <select value={intentMode} onChange={(event) => onIntentModeChange?.(event.target.value)} aria-label="本轮工作方式" disabled={readOnly}>
-            <option value="auto">自动</option>
-            <option value="chat">仅聊天</option>
-            <option value="local">仅本地</option>
-            <option value="deep_research">深度研究</option>
-            <option value="execute">执行任务</option>
-          </select>
-        </label>
+        <div className="composer-policy-row">
+          <div className="composer-lane-switch" role="group" aria-label="工作方式">
+            <button type="button" className={cx(interactionMode === "ask" && "active")} onClick={() => onInteractionModeChange?.("ask")} disabled={readOnly} title="日常询问"><MessageCircle size={13} />询问</button>
+            <button type="button" className={cx(interactionMode === "research" && "active")} onClick={() => onInteractionModeChange?.("research")} disabled={readOnly} title="后台研究任务"><FlaskConical size={13} />研究任务</button>
+          </div>
+          <label className="composer-source-select" title="本轮允许检索的来源">
+            <Search size={12} />
+            <span className="sr-only">来源范围</span>
+            <select value={sourcePolicy} onChange={(event) => onSourcePolicyChange?.(event.target.value)} disabled={readOnly} aria-label="来源范围">
+              <option value="local_and_external">全部来源</option>
+              <option value="local_only">仅本地</option>
+              <option value="atlas_only">仅 Atlas</option>
+              <option value="external_only">仅外部</option>
+              <option value="none">不检索</option>
+            </select>
+          </label>
+        </div>
         <div className="composer-run-actions">
           {isRunning && <button type="button" className="send-button stop" title="停止 Main Agent" onClick={onStop}><Square size={14} /></button>}
           <button type="submit" className="send-button" title={isRunning ? "追加要求" : COMPOSER_COPY.sendTitle} disabled={readOnly || !value.trim()}><Send size={16} /></button>
         </div>
       </form>
+      <div className="composer-execution-summary" aria-live="polite">
+        <span>{contextSummary} · {sourceSummary} · {boundarySummary}</span>
+        {interactionMode === "research" && (
+          <div className="composer-research-brief" aria-label="研究任务简报">
+            <label>
+              <span>产物</span>
+              <select
+                value={researchDeliverable}
+                onChange={(event) => onResearchDeliverableChange?.(event.target.value)}
+                disabled={readOnly}
+                aria-label="期望产物"
+              >
+                <option value="research_note">研究纪要</option>
+                <option value="answer">直接回答</option>
+                <option value="comparison">证据比较</option>
+                <option value="literature_map">文献图谱</option>
+                <option value="evidence_audit">证据审计</option>
+              </select>
+            </label>
+            <label>
+              <span>深度</span>
+              <select
+                value={researchDepth}
+                onChange={(event) => onResearchDepthChange?.(event.target.value)}
+                disabled={readOnly}
+                aria-label="研究深度"
+              >
+                <option value="standard">标准</option>
+                <option value="deep">深入</option>
+              </select>
+            </label>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

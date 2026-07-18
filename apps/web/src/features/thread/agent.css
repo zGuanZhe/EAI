@@ -932,10 +932,53 @@ button.agent-run-line:hover strong {
   z-index: 32;
   display: grid;
   width: min(400px, calc(100vw - var(--left-width)));
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   border-left: 1px solid rgba(17, 136, 102, 0.18);
   background: #f8faf9;
   box-shadow: -4px 0 12px rgba(30, 38, 48, 0.06);
+}
+
+.research-task-shelf {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 320px) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 48px;
+  padding: 7px max(24px, calc((100% - 820px) / 2));
+  border-bottom: 1px solid rgba(120, 86, 216, 0.14);
+  background: rgba(120, 86, 216, 0.045);
+}
+
+.research-task-summary,
+.research-task-summary span,
+.research-task-actions,
+.research-task-steer {
+  display: flex;
+  align-items: center;
+}
+
+.research-task-summary { min-width: 0; gap: 8px; color: #6448b0; }
+.research-task-summary span { min-width: 0; gap: 7px; }
+.research-task-summary strong { overflow: hidden; color: #3e3a49; font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; }
+.research-task-summary em { flex: 0 0 auto; color: #756b88; font-size: 10.5px; font-style: normal; }
+.research-task-steer { min-width: 0; gap: 4px; }
+.research-task-steer input { width: 100%; min-width: 0; height: 30px; padding: 0 8px; border: 1px solid rgba(120, 86, 216, 0.14); border-radius: 7px; background: #fff; font: inherit; font-size: 11px; }
+.research-task-steer button,
+.research-task-actions button { display: inline-flex; height: 30px; min-width: 30px; align-items: center; justify-content: center; gap: 5px; padding: 0 7px; border: 0; border-radius: 7px; background: rgba(120, 86, 216, 0.09); color: #6448b0; cursor: pointer; font-size: 10.5px; }
+.research-task-steer button:disabled { opacity: .45; cursor: default; }
+.research-task-actions { gap: 4px; justify-content: flex-end; }
+.research-task-actions .promote { padding: 0 9px; white-space: nowrap; }
+
+@media (max-width: 900px) {
+  .research-task-shelf { grid-template-columns: minmax(0, 1fr) auto; padding-right: 18px; padding-left: 18px; }
+  .research-task-steer { grid-column: 1 / -1; grid-row: 2; }
+}
+
+@media (max-width: 760px) {
+  .research-task-shelf { padding: 7px 12px; }
+  .research-task-summary em { display: none; }
+  .research-task-actions .promote { width: 30px; overflow: hidden; padding: 0; color: transparent; gap: 0; }
+  .research-task-actions .promote svg { color: #6448b0; }
 }
 
 .context-drawer-header {
@@ -985,7 +1028,7 @@ button.agent-run-line:hover strong {
 .agent-thread-surface {
   position: relative;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   width: 100%;
   max-width: none;
   min-height: 100%;

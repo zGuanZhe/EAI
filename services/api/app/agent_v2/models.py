@@ -19,6 +19,7 @@ SourcePolicy = Literal["none", "atlas_only", "local_only", "external_only", "loc
 TaskStatus = Literal[
     "pending",
     "running",
+    "paused",
     "waiting_approval",
     "done",
     "failed",
@@ -234,6 +235,11 @@ class AgentTask(BaseModel):
     parent_task_id: str | None = None
     attempt: int = 1
     runtime_version: str = "2.1"
+    interaction_lane: Literal["legacy", "ask", "research"] = "legacy"
+    phase: str = "intake"
+    context_manifest_id: str = ""
+    retrieval_decision: dict[str, Any] = Field(default_factory=dict)
+    research_profile: dict[str, Any] = Field(default_factory=dict)
     active_attempt_id: str = ""
     service: ServiceType = "conversation"
     status: TaskStatus = "pending"
@@ -258,6 +264,14 @@ class AgentEvent(BaseModel):
     seq: int
     kind: Literal[
         "service_selected",
+        "context_ready",
+        "search_started",
+        "search_completed",
+        "connector_unavailable",
+        "checkpoint",
+        "paused",
+        "resumed",
+        "campaign_ready",
         "objective_confirmed",
         "status",
         "specialist_started",

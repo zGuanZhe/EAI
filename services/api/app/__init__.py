@@ -1,1 +1,1 @@
-"""EAI vNext thin service."""
+"""EAI Desktop service."""

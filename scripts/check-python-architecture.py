@@ -19,6 +19,7 @@ ROUTE_ALLOWLIST = {
     "routers/workspace.py",
     "routers/atlas.py",
     "routers/agent_v2.py",
+    "routers/agent_v3.py",
     "routers/legacy.py",
     "routers/thread_content.py",
     "routers/change_review.py",
@@ -146,10 +147,10 @@ for path in sorted(APP.rglob("*.py")):
             if not module.startswith(allowed_roots):
                 FAILURES.append(f"{rel}: router dependency '{module}' must go through schemas or services")
 
-    if rel.startswith(("agent_v2/", "research/", "campaign/")) and any("legacy" in module.split(".") for module in modules):
+    if rel.startswith(("agent_v2/", "agent_v3/", "research/", "campaign/")) and any("legacy" in module.split(".") for module in modules):
         FAILURES.append(f"{rel}: hot-path domains must not import legacy compatibility code")
 
-    if rel.startswith(("agent_v2/", "research/", "campaign/")):
+    if rel.startswith(("agent_v2/", "agent_v3/", "research/", "campaign/")):
         for node in tree.body:
             if isinstance(node, ast.Assign):
                 names = [target.id for target in node.targets if isinstance(target, ast.Name)]
@@ -166,7 +167,7 @@ for path in sorted(APP.rglob("*.py")):
 if application_route_count:
     FAILURES.append("application.py: HTTP routes must be registered from router modules")
 
-for entry in sorted(path for path in module_graph if path.startswith(("agent_v2/", "research/", "campaign/"))):
+for entry in sorted(path for path in module_graph if path.startswith(("agent_v2/", "agent_v3/", "research/", "campaign/"))):
     pending = list(module_graph[entry])
     visited: set[str] = set()
     while pending:

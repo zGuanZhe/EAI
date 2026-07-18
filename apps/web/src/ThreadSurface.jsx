@@ -8,6 +8,7 @@ import { AgentV2Activity } from "./features/thread/AgentV2Activity.jsx";
 import { MarkdownMessage } from "./features/thread/MarkdownMessage.jsx";
 import { MessageAttachments } from "./features/thread/MessageAttachments.jsx";
 import { SourceCitations } from "./features/thread/SourceCitations.jsx";
+import { ResearchTaskShelf } from "./features/thread/ResearchTaskShelf.jsx";
 import { messageMeta, resultItems, resultItemTitle, syntheticMessages } from "./messages.js";
 
 function cx(...parts) {
@@ -57,7 +58,13 @@ export function ThreadSurface({
   onOpenAttachment,
   onOpenChangeset,
   onInspectApproval,
-  onUndoOperationBatch
+  onUndoOperationBatch,
+  researchTasks,
+  onSteerResearch,
+  onPauseResearch,
+  onResumeResearch,
+  onCancelResearch,
+  onPromoteResearch
 }) {
   const results = thread.result_cards || [];
   const runs = thread.tool_runs || [];
@@ -104,6 +111,14 @@ export function ThreadSurface({
         </div>
         <p>{readableGoal(thread.goal, THREAD_COPY.defaultGoal)}</p>
       </header>
+      <ResearchTaskShelf
+        tasks={researchTasks}
+        onSteer={onSteerResearch}
+        onPause={onPauseResearch}
+        onResume={onResumeResearch}
+        onCancel={onCancelResearch}
+        onPromote={onPromoteResearch}
+      />
       <section className="chat-log" ref={logRef} aria-live="polite" aria-busy={running}>
         {groups.map((group, index) => group.type === "activity" ? (
           <ActivityRow key={`activity-${index}`} messages={group.messages} />
@@ -153,7 +168,7 @@ function MessageTurn({ message, results, runs, onOpenCanvas, onSuggestionAction,
   const attachments = message.refs?.turn_attachments || message.refs?.context_snapshot?.turn_attachments || [];
   const content = result ? result.raw_text.slice(0, 1200) : localizeMessageContent(message.content);
   const processing = isAgentReply && ["pending", "streaming"].includes(message.status);
-  const isAgentV2 = message.refs?.agent_runtime === "v2" || Boolean(message.refs?.agent_v2_task_id);
+  const isAgentV2 = ["v2", "v3"].includes(message.refs?.agent_runtime) || Boolean(message.refs?.agent_v2_task_id || message.refs?.agent_v3_task_id);
 
   return (
     <article

@@ -1,4 +1,4 @@
-# EAI-Desktop vNext Design
+# EAI Desktop 1.0 Design
 
 ## Register
 
@@ -41,7 +41,7 @@ Codex-like research workspace:
 ## Interaction Rules
 
 - Enter sends; Shift+Enter inserts a newline; Esc stops the active Main Agent run.
-- During an active research task the Composer shows separate Stop and Send controls; Send appends a steering requirement. During approval wait it returns to normal new-turn behavior.
+- An active ResearchTask never repurposes the Composer. The non-modal task bar owns targeted steer, pause, resume and cancel controls; the Composer continues to create ordinary AskTurns. A running AskTurn retains separate Stop and Send controls.
 - `/atlas`, `/context`, and `/tools` are the only primary commands.
 - Task Pack copy and manual import live only in collapsed advanced context editors.
 - Ordinary conversation displays no trace. Research and operation tasks show one natural-language active state; completed work collapses to source and artifact counts, with capability and Observation audit available on demand.

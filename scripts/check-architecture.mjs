@@ -56,7 +56,7 @@ for (const path of sourceFiles("apps").concat(sourceFiles("services"), sourceFil
   if (/D:\\Test\\GUAN\\EAI-Desktop/i.test(content)) failures.push(`${path}: contains old workspace path`);
 }
 
-for (const directory of ["services/api/app/agent_v2", "services/api/app/research", "services/api/app/campaign"]) {
+for (const directory of ["services/api/app/agent_v2", "services/api/app/agent_v3", "services/api/app/research", "services/api/app/campaign"]) {
   for (const path of sourceFiles(directory)) {
     if (/from\s+app\.legacy|from\s+\.\.legacy|import\s+app\.legacy/.test(read(path))) {
       failures.push(`${path}: hot-path module depends on legacy compatibility code`);
@@ -68,7 +68,7 @@ const packageVersion = JSON.parse(read("package.json")).version;
 const webVersion = JSON.parse(read("apps/web/package.json")).version;
 const tauriVersion = JSON.parse(read("apps/desktop/src-tauri/tauri.conf.json")).version;
 const cargoVersion = read("apps/desktop/src-tauri/Cargo.toml").match(/^version\s*=\s*"([^"]+)"/m)?.[1];
-if (new Set([packageVersion, webVersion, tauriVersion, cargoVersion]).size !== 1 || packageVersion !== "0.5.0") {
+if (new Set([packageVersion, webVersion, tauriVersion, cargoVersion]).size !== 1 || packageVersion !== "1.0.0") {
   failures.push(`version mismatch: package=${packageVersion}, web=${webVersion}, tauri=${tauriVersion}, cargo=${cargoVersion}`);
 }
 

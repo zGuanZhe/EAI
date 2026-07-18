@@ -7,6 +7,7 @@ from typing import Any
 
 from ..agent_v2.runtime import AgentRuntimeV2
 from .agent_api import AgentApiService
+from .agent_v3 import AgentV3Service
 from ..campaign.service import CampaignService
 from ..research.enrichment import KnowledgeEnrichmentService
 from ..research.page_preview import PagePreviewService
@@ -18,13 +19,14 @@ class AppServices:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self.agent_thread_lock = threading.RLock()
-        self._research_signature: tuple[Path, Path, Path] | None = None
+        self._research_signature: tuple[Path, Path, Path, bool, str] | None = None
         self._runtime_signature: tuple[Path, bool, int] | None = None
         self._research_store: ResearchStore | None = None
         self._enrichment: KnowledgeEnrichmentService | None = None
         self._page_preview: PagePreviewService | None = None
         self._agent_runtime: AgentRuntimeV2 | None = None
         self._agent_api: AgentApiService | None = None
+        self._agent_v3: AgentV3Service | None = None
         self._campaign: CampaignService | None = None
         self._domain_services: dict[str, tuple[tuple[Any, ...], Any]] = {}
 
@@ -32,14 +34,29 @@ class AppServices:
     def agent_runtime_if_created(self) -> AgentRuntimeV2 | None:
         return self._agent_runtime
 
-    def research_store(self, research_dir: Path, atlas_dir: Path, personal_dir: Path) -> ResearchStore:
-        signature = (research_dir.resolve(), atlas_dir.resolve(), personal_dir.resolve())
+    def research_store(
+        self,
+        research_dir: Path,
+        atlas_dir: Path,
+        personal_dir: Path,
+        *,
+        force_read_only: bool = False,
+        read_only_reason: str = "",
+    ) -> ResearchStore:
+        signature = (
+            research_dir.resolve(), atlas_dir.resolve(), personal_dir.resolve(),
+            force_read_only, read_only_reason,
+        )
         with self._lock:
             if self._research_signature != signature:
                 self._close_locked()
                 self._research_signature = signature
             if self._research_store is None:
-                self._research_store = ResearchStore(*signature)
+                self._research_store = ResearchStore(
+                    signature[0], signature[1], signature[2],
+                    force_read_only=force_read_only,
+                    read_only_reason=read_only_reason,
+                )
             return self._research_store
 
     def enrichment(
@@ -101,6 +118,16 @@ class AppServices:
                 self._agent_api = factory()
             return self._agent_api
 
+    def agent_v3(
+        self,
+        runtime: AgentRuntimeV2,
+        factory: Callable[[], AgentV3Service],
+    ) -> AgentV3Service:
+        with self._lock:
+            if self._agent_v3 is None or self._agent_v3.runtime is not runtime:
+                self._agent_v3 = factory()
+            return self._agent_v3
+
     def domain_service(
         self,
         name: str,
@@ -126,6 +153,7 @@ class AppServices:
 
     def _close_runtime_locked(self) -> None:
         self._agent_api = None
+        self._agent_v3 = None
         self._campaign = None
         self._domain_services.clear()
         if self._agent_runtime is not None:

@@ -1,8 +1,10 @@
 {
   "name": "eai-desktop",
   "private": true,
-  "version": "0.5.0",
-  "workspaces": ["apps/web"],
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/web"
+  ],
   "scripts": {
     "bootstrap": "powershell -ExecutionPolicy Bypass -File scripts/bootstrap.ps1",
     "dev": "powershell -ExecutionPolicy Bypass -File scripts/dev-desktop.ps1",

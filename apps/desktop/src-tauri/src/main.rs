@@ -26,11 +26,14 @@ struct RuntimeInfo {
 }
 
 #[derive(Clone, Deserialize, Serialize)]
+#[serde(default)]
 struct ProviderConfig {
     provider: String,
     base_url: String,
     model: String,
     api_format: String,
+    web_search_provider: String,
+    web_search_base_url: String,
 }
 
 impl Default for ProviderConfig {
@@ -40,6 +43,8 @@ impl Default for ProviderConfig {
             base_url: "https://api.openai.com/v1".into(),
             model: "gpt-4.1-mini".into(),
             api_format: "responses".into(),
+            web_search_provider: String::new(),
+            web_search_base_url: String::new(),
         }
     }
 }
@@ -134,6 +139,13 @@ fn provider_key(provider: &str) -> Option<String> {
     })
 }
 
+fn web_search_key(provider: &str) -> Option<String> {
+    if provider.is_empty() || provider == "searxng" {
+        return None;
+    }
+    credential(&format!("web-search:{provider}"))
+}
+
 fn default_provider_config() -> ProviderConfig {
     let explicit_openai = std::env::var("OPENAI_BASE_URL").is_ok()
         || (provider_key("openai").is_some() && provider_key("openrouter").is_none());
@@ -144,6 +156,8 @@ fn default_provider_config() -> ProviderConfig {
                 .unwrap_or_else(|_| "https://api.openai.com/v1".into()),
             model: std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4.1-mini".into()),
             api_format: std::env::var("OPENAI_API_FORMAT").unwrap_or_else(|_| "responses".into()),
+            web_search_provider: std::env::var("EAI_WEB_SEARCH_PROVIDER").unwrap_or_default(),
+            web_search_base_url: std::env::var("EAI_WEB_SEARCH_BASE_URL").unwrap_or_default(),
         }
     } else {
         ProviderConfig {
@@ -152,6 +166,8 @@ fn default_provider_config() -> ProviderConfig {
                 .unwrap_or_else(|_| "https://openrouter.ai/api/v1".into()),
             model: std::env::var("OPENROUTER_MODEL").unwrap_or_else(|_| "openrouter/auto".into()),
             api_format: "chat".into(),
+            web_search_provider: std::env::var("EAI_WEB_SEARCH_PROVIDER").unwrap_or_default(),
+            web_search_base_url: std::env::var("EAI_WEB_SEARCH_BASE_URL").unwrap_or_default(),
         }
     }
 }
@@ -161,6 +177,12 @@ fn validate_provider_config(mut config: ProviderConfig) -> Result<ProviderConfig
     config.base_url = config.base_url.trim().trim_end_matches('/').to_string();
     config.model = config.model.trim().to_string();
     config.api_format = config.api_format.trim().to_lowercase();
+    config.web_search_provider = config.web_search_provider.trim().to_lowercase();
+    config.web_search_base_url = config
+        .web_search_base_url
+        .trim()
+        .trim_end_matches('/')
+        .to_string();
     if !matches!(config.provider.as_str(), "openrouter" | "openai") {
         return Err("无效的 Provider".into());
     }
@@ -169,6 +191,37 @@ fn validate_provider_config(mut config: ProviderConfig) -> Result<ProviderConfig
     }
     if !matches!(config.api_format.as_str(), "chat" | "responses") {
         return Err("API 格式必须是 chat 或 responses".into());
+    }
+    if !matches!(
+        config.web_search_provider.as_str(),
+        "" | "searxng" | "brave" | "tavily"
+    ) {
+        return Err("网页搜索 Provider 必须是 SearXNG、Brave 或 Tavily".into());
+    }
+    if config.web_search_provider == "brave" && config.web_search_base_url.is_empty() {
+        config.web_search_base_url = "https://api.search.brave.com/res/v1/web/search".into();
+    }
+    if config.web_search_provider == "tavily" && config.web_search_base_url.is_empty() {
+        config.web_search_base_url = "https://api.tavily.com/search".into();
+    }
+    if config.web_search_provider == "searxng" {
+        let search_url = Url::parse(&config.web_search_base_url)
+            .map_err(|_| "SearXNG 地址不是有效 URL".to_string())?;
+        if !search_url.username().is_empty()
+            || search_url.password().is_some()
+            || search_url.query().is_some()
+        {
+            return Err("SearXNG 地址不能包含凭据或查询参数".into());
+        }
+        let search_loopback = match search_url.host() {
+            Some(Host::Domain(host)) => host.eq_ignore_ascii_case("localhost"),
+            Some(Host::Ipv4(address)) => address.is_loopback(),
+            Some(Host::Ipv6(address)) => address.is_loopback(),
+            None => false,
+        };
+        if search_url.scheme() != "https" && !(search_url.scheme() == "http" && search_loopback) {
+            return Err("远程 SearXNG 必须使用 HTTPS；HTTP 仅允许 loopback".into());
+        }
     }
     let parsed = Url::parse(&config.base_url).map_err(|_| "请求地址不是有效 URL".to_string())?;
     if !parsed.username().is_empty()
@@ -264,7 +317,10 @@ async fn launch_backend(app: AppHandle) -> Result<(), String> {
         ]);
     command = command
         .env("OPENROUTER_API_KEY", "")
-        .env("OPENAI_API_KEY", "");
+        .env("OPENAI_API_KEY", "")
+        .env("EAI_WEB_SEARCH_PROVIDER", "")
+        .env("EAI_WEB_SEARCH_BASE_URL", "")
+        .env("EAI_WEB_SEARCH_API_KEY", "");
     if provider.provider == "openrouter" {
         command = command
             .env("OPENROUTER_BASE_URL", &provider.base_url)
@@ -279,6 +335,14 @@ async fn launch_backend(app: AppHandle) -> Result<(), String> {
             .env("OPENAI_API_FORMAT", &provider.api_format);
         if let Some(value) = provider_key("openai") {
             command = command.env("OPENAI_API_KEY", value);
+        }
+    }
+    if !provider.web_search_provider.is_empty() {
+        command = command
+            .env("EAI_WEB_SEARCH_PROVIDER", &provider.web_search_provider)
+            .env("EAI_WEB_SEARCH_BASE_URL", &provider.web_search_base_url);
+        if let Some(value) = web_search_key(&provider.web_search_provider) {
+            command = command.env("EAI_WEB_SEARCH_API_KEY", value);
         }
     }
 
@@ -448,6 +512,7 @@ fn get_provider_config(app: AppHandle) -> Result<ProviderConfig, String> {
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 async fn save_provider_config(
     app: AppHandle,
     provider: String,
@@ -455,12 +520,17 @@ async fn save_provider_config(
     model: String,
     api_format: String,
     secret: Option<String>,
+    web_search_provider: String,
+    web_search_base_url: String,
+    web_search_secret: Option<String>,
 ) -> Result<RuntimeInfo, String> {
     let config = validate_provider_config(ProviderConfig {
         provider,
         base_url,
         model,
         api_format,
+        web_search_provider,
+        web_search_base_url,
     })?;
     if let Some(value) = secret.filter(|value| !value.trim().is_empty()) {
         keyring::Entry::new("EAI Desktop", &config.provider)
@@ -470,6 +540,20 @@ async fn save_provider_config(
     }
     if provider_key(&config.provider).is_none() {
         return Err("请输入 API Key".into());
+    }
+    if let Some(value) = web_search_secret.filter(|value| !value.trim().is_empty()) {
+        keyring::Entry::new(
+            "EAI Desktop",
+            &format!("web-search:{}", config.web_search_provider),
+        )
+        .map_err(|error| error.to_string())?
+        .set_password(value.trim())
+        .map_err(|error| error.to_string())?;
+    }
+    if matches!(config.web_search_provider.as_str(), "brave" | "tavily")
+        && web_search_key(&config.web_search_provider).is_none()
+    {
+        return Err("请输入网页搜索 API Key".into());
     }
     let app_data = resolve_app_data_dir(&app)?;
     write_provider_config(&app_data, &config)?;
@@ -625,11 +709,24 @@ mod tests {
             base_url: base_url.into(),
             model: "test-model".into(),
             api_format: "chat".into(),
+            web_search_provider: String::new(),
+            web_search_base_url: String::new(),
         };
-        assert!(validate_provider_config(config("http://localhost:8317/v1")).is_ok());
-        assert!(validate_provider_config(config("http://127.0.0.1:8317/v1")).is_ok());
+        assert!(validate_provider_config(config("http://localhost:12345/v1")).is_ok());
+        assert!(validate_provider_config(config("http://127.0.0.1:12345/v1")).is_ok());
         assert!(validate_provider_config(config("https://relay.example/v1")).is_ok());
         assert!(validate_provider_config(config("http://relay.example/v1")).is_err());
         assert!(validate_provider_config(config("https://user:secret@relay.example/v1")).is_err());
+    }
+
+    #[test]
+    fn legacy_provider_config_defaults_web_search_fields() {
+        let config: ProviderConfig = serde_json::from_str(
+            r#"{"provider":"openai","base_url":"http://127.0.0.1:12345/v1","model":"local","api_format":"chat"}"#,
+        )
+        .expect("legacy provider config");
+        assert!(config.web_search_provider.is_empty());
+        assert!(config.web_search_base_url.is_empty());
+        assert!(validate_provider_config(config).is_ok());
     }
 }

@@ -1,8 +1,12 @@
-# EAI-Desktop vNext Product
+# EAI Desktop 1.0 Product
 
 ## Product
 
-EAI-Desktop vNext is a Codex-like personal research workspace for turning paper graphs into research decisions. Its Main Agent can investigate the current thread, Atlas, Context Canvas, and object memory, while every durable modification remains visible, reviewable, and reversible.
+EAI Desktop is a Codex-like personal research workspace for turning paper graphs into research decisions. Its Main Agent can investigate the current thread, Atlas, Context Canvas, and object memory, while every durable modification remains visible, reviewable, and reversible.
+
+Agent v3 exposes four explicit product outcomes. `询问` handles daily questions; informational questions perform one bounded parallel retrieval over every allowed and configured local, Atlas, academic and web source, while greetings and text transformations do not search. `研究任务` runs a checkpointed evidence investigation in the background without occupying the Composer. A completed investigation can be explicitly promoted to a Research Campaign. System operations are limited to registered EAI capabilities: reads and restricted navigation are automatic, durable writes use confirmed OperationBatch receipts and safe undo, and experiments or Campaign stage transitions retain their own approvals.
+
+An OpenAI-compatible model endpoint is only a model channel. EAI never assumes it provides web search. Generic web retrieval requires an independently configured SearXNG, Brave or Tavily connector; unavailable connectors are shown as unavailable and cannot be simulated by model claims.
 
 ## Main Loop
 
@@ -45,11 +49,11 @@ Every visible primary action must serve one of those steps. Capabilities outside
 ## Success Criteria
 
 - Users always know which project, thread, backend root, personal data directory, and Atlas cache they are using.
-- Plain input always starts a durable Main Agent v2 turn; only `/atlas`, `/context`, and `/tools` execute UI commands.
+- Plain input starts a durable Agent v3 AskTurn or ResearchTask; `/atlas`, `/context`, and `/tools` remain explicit user commands.
 - Ordinary conversation has no tool, Skill, source, or audit noise. Research tasks show natural progress and collapse to source/artifact counts after completion.
-- While research is running, the Composer remains usable as “追加要求”; steer messages are applied at the next safe checkpoint without creating a duplicate task.
+- While research is running, the Composer remains available for normal questions. Research steering is sent only through the named task bar and is applied at a safe checkpoint.
 - Waiting approvals never lock the conversation. A new question starts a normal turn while the old OperationBatch remains conflict-checked and independently resolvable.
-- Composer mode can override routing with `自动 / 仅聊天 / 仅本地 / 深度研究 / 执行任务`.
+- Composer has two peer lanes, `询问 / 研究任务`, plus an independent source boundary. Research defaults for deliverable and depth can be used without filling a form.
 - Main dialogue remains readable first: user turns use light bubbles, assistant turns use Markdown prose, and audit details collapse after completion.
 - Agent retrieval works without manually selected material; papers may be attached for one turn or retained as long-term thread material without quotas.
 - Paper reading is a reading-first object page. New paper questions return to the Main Agent instead of creating a second chat history.

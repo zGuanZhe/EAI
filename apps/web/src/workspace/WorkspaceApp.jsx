@@ -223,7 +223,10 @@ export function App() {
   const [atlasControls, setAtlasControls] = useState(null);
   const [toolOpen, setToolOpen] = useState(false);
   const [composer, setComposer] = useState("");
-  const [agentMode, setAgentMode] = useState("auto");
+  const [agentMode, setAgentMode] = useState("ask");
+  const [sourcePolicy, setSourcePolicy] = useState("local_and_external");
+  const [researchDeliverable, setResearchDeliverable] = useState("research_note");
+  const [researchDepth, setResearchDepth] = useState("standard");
   const [exported, setExported] = useState("");
   const [pasteText, setPasteText] = useState("");
   const [resultPreview, setResultPreview] = useState(null);
@@ -293,7 +296,11 @@ export function App() {
     setSettingsOpen(true);
   }
 
-  const { chatError, isRunning, sendThreadChat, steerThreadChat, stopThreadChat, retryThreadChat, resolveApproval, undoOperationBatch } = useAgentV2({
+  const {
+    chatError, isRunning, researchTasks, sendThreadChat, steerThreadChat, stopThreadChat,
+    retryThreadChat, resolveApproval, undoOperationBatch, steerResearchTask, pauseResearchTask,
+    resumeResearchTask, cancelResearchTask, promoteResearchTask
+  } = useAgentV2({
     thread,
     surface,
     setThread,
@@ -1432,7 +1439,7 @@ export function App() {
       } else if (text.startsWith("/")) {
         setContextDrawerOpen(false);
         const draftRevision = await flushDraft();
-        const completed = await sendThreadChat(text, { surface, turnAttachments: currentTurnAttachments(), intentOverride: agentMode });
+        const completed = await sendThreadChat(text, { surface, turnAttachments: currentTurnAttachments(), interactionMode: agentMode, sourcePolicy, deliverable: researchDeliverable, depth: researchDepth });
         if (completed) {
           await clearDraftAfterPersist(draftRevision);
           clearTurnAttachments();
@@ -1443,7 +1450,7 @@ export function App() {
       } else {
         setContextDrawerOpen(false);
         const draftRevision = await flushDraft();
-        const completed = await sendThreadChat(text, { surface, turnAttachments: currentTurnAttachments(), intentOverride: agentMode });
+        const completed = await sendThreadChat(text, { surface, turnAttachments: currentTurnAttachments(), interactionMode: agentMode, sourcePolicy, deliverable: researchDeliverable, depth: researchDepth });
         if (completed) {
           await clearDraftAfterPersist(draftRevision);
           clearTurnAttachments();
@@ -1586,8 +1593,14 @@ export function App() {
                 onStop={stopThreadChat}
                 attachments={turnAttachments}
                 onRemoveAttachment={removeTurnAttachment}
-                intentMode={agentMode}
-                onIntentModeChange={setAgentMode}
+                interactionMode={agentMode}
+                onInteractionModeChange={setAgentMode}
+                sourcePolicy={sourcePolicy}
+                onSourcePolicyChange={setSourcePolicy}
+                researchDeliverable={researchDeliverable}
+                onResearchDeliverableChange={setResearchDeliverable}
+                researchDepth={researchDepth}
+                onResearchDepthChange={setResearchDepth}
                 readOnly={researchReadOnly}
               />
             )}
@@ -1677,6 +1690,15 @@ export function App() {
                   }}
                   onInspectApproval={inspectAgentApproval}
                   onUndoOperationBatch={undoOperationBatch}
+                  researchTasks={researchTasks}
+                  onSteerResearch={steerResearchTask}
+                  onPauseResearch={pauseResearchTask}
+                  onResumeResearch={resumeResearchTask}
+                  onCancelResearch={cancelResearchTask}
+                  onPromoteResearch={async (taskId) => {
+                    const result = await promoteResearchTask(taskId);
+                    if (result?.campaign) setStatus(`已创建 Campaign：${result.campaign.title}`);
+                  }}
                 />
               )}
             </section>
@@ -1706,8 +1728,14 @@ export function App() {
           onStop={stopThreadChat}
           attachments={turnAttachments}
           onRemoveAttachment={removeTurnAttachment}
-          intentMode={agentMode}
-          onIntentModeChange={setAgentMode}
+          interactionMode={agentMode}
+          onInteractionModeChange={setAgentMode}
+          sourcePolicy={sourcePolicy}
+          onSourcePolicyChange={setSourcePolicy}
+          researchDeliverable={researchDeliverable}
+          onResearchDeliverableChange={setResearchDeliverable}
+          researchDepth={researchDepth}
+          onResearchDepthChange={setResearchDepth}
           readOnly={researchReadOnly}
         />}
       </main>

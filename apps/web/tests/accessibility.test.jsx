@@ -7,7 +7,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import { Composer } from "../src/Composer.jsx";
 
-
 describe("read-only workspace controls", () => {
   it("disables message mutations and has no serious axe violations", async () => {
     const { container } = render(
@@ -25,7 +24,9 @@ describe("read-only workspace controls", () => {
     );
 
     expect(screen.getByRole("textbox").disabled).toBe(true);
-    expect(screen.getByRole("combobox", { name: "本轮工作方式" }).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: "询问" }).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: "研究任务" }).disabled).toBe(true);
+    expect(screen.getByRole("combobox", { name: "来源范围" }).disabled).toBe(true);
     expect(screen.getByRole("button", { name: "发送" }).disabled).toBe(true);
 
     const results = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });

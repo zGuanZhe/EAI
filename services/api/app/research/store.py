@@ -109,6 +109,8 @@ class ResearchStore:
         personal_dir: Path,
         *,
         supported_schema_version: int = SCHEMA_VERSION,
+        force_read_only: bool = False,
+        read_only_reason: str = "",
     ):
         self.research_dir = research_dir.resolve()
         self.atlas_dir = atlas_dir.resolve()
@@ -117,8 +119,9 @@ class ResearchStore:
         self.model_dir = self.research_dir / "models"
         self.index_dir = self.research_dir / "indexes"
         self.backup_dir = self.research_dir / "migration-backups"
-        for directory in [self.research_dir, self.blob_dir, self.model_dir, self.index_dir, self.backup_dir]:
-            directory.mkdir(parents=True, exist_ok=True)
+        if not force_read_only:
+            for directory in [self.research_dir, self.blob_dir, self.model_dir, self.index_dir, self.backup_dir]:
+                directory.mkdir(parents=True, exist_ok=True)
         self.db_path = self.research_dir / "research.db"
         self.embedding_profile = LocalEmbeddingProfile(self.model_dir)
         self._lock = threading.RLock()
@@ -126,14 +129,19 @@ class ResearchStore:
         self._active_calls = 0
         self.supported_schema_version = supported_schema_version
         self.schema_version = 0
-        self.read_only = False
+        self.read_only = force_read_only
+        self.read_only_reason = read_only_reason
         self._open_connection()
         startup_backup: Path | None = None
         try:
             previous_version = self._current_schema_version()
             self.schema_version = previous_version
+            if force_read_only:
+                self.close()
+                return
             if previous_version > self.supported_schema_version:
                 self.read_only = True
+                self.read_only_reason = "schema_newer_than_app"
                 self.close()
                 self._open_connection()
                 self.close()
@@ -209,7 +217,7 @@ class ResearchStore:
             "schema_version": self.schema_version,
             "supported_schema_version": self.supported_schema_version,
             "read_only": self.read_only,
-            "reason": "schema_newer_than_app" if self.read_only else "",
+            "reason": self.read_only_reason or ("schema_newer_than_app" if self.read_only else ""),
         }
         if not self.read_only and self.schema_version >= 4:
             status["projection"] = self.projection_status()

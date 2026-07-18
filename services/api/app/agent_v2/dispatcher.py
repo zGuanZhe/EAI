@@ -69,6 +69,12 @@ class CapabilityDispatcher:
             )
             data = {"warnings": warnings}
             summary = f"从外部学术源找到 {len(sources)} 个来源。"
+        elif capability_id == "web.search":
+            sources = self.sources.search_web(str(arguments["query"]), task.id, int(arguments.get("limit") or 8))
+            summary = f"从通用网页搜索找到 {len(sources)} 个来源。"
+        elif capability_id == "web.read":
+            sources = [self.sources.read_web(str(arguments["url"]), task.id)]
+            summary = "已读取并清洗公开网页正文。"
         elif capability_id == "documents.import_open":
             source = self.store.get_source(str(arguments["source_id"]))
             if not source:
@@ -90,7 +96,21 @@ class CapabilityDispatcher:
             data = self.dependencies.campaign_execute(capability_id, arguments, task.thread_id)
             summary = clean_text(data.get("summary") or specification.label, 500)
         elif capability_id == "navigation.open":
-            data = {"next_action": {"action": "open_object", **arguments}}
+            command = {
+                "id": f"ui_command_{call.id.removeprefix('tool_call_')}",
+                "task_id": task.id,
+                "action": "open_object",
+                "target": {
+                    "type": clean_text(arguments.get("type"), 80),
+                    "id": clean_text(arguments.get("id"), 240),
+                    "title": clean_text(arguments.get("title"), 500),
+                },
+                "status": "pending",
+                "created_at": call.created_at,
+                "resolved_at": None,
+            }
+            self.store.save_ui_command(command)
+            data = {"ui_command": command}
             summary = f"已准备打开 {arguments.get('title') or arguments.get('type')}。"
         else:
             raise ValueError(f"能力未绑定执行器：{capability_id}")

@@ -1,4 +1,6 @@
-import { Archive, BookOpenCheck, ChevronRight, Clock3, Database, FileText, KeyRound, Pause, Play, RefreshCcw, RotateCcw, ShieldCheck, Sparkles, Square } from "lucide-react";
+import { Archive, BookOpenCheck, ChevronRight, Clock3, Database, FileText, Globe2, KeyRound, Pause, Play, RefreshCcw, RotateCcw, ShieldCheck, Sparkles, Square } from "lucide-react";
+import { useEffect, useState } from "react";
+import { api } from "../../api.js";
 import { ActivityRow, EmptyState, StatusDot, SurfaceHeader } from "../../components/ui/index.jsx";
 import "./tools.css";
 
@@ -22,6 +24,15 @@ export function RunCenter({
 }) {
   const runs = thread?.tool_runs || [];
   const changes = (thread?.changesets || []).filter((item) => ["pending", "conflicted"].includes(item.status));
+  const [capabilities, setCapabilities] = useState([]);
+  const [connectors, setConnectors] = useState([]);
+  useEffect(() => {
+    Promise.all([api("/agent/capabilities"), api("/search-connectors/status")])
+      .then(([nextCapabilities, nextConnectors]) => {
+        setCapabilities(nextCapabilities || []);
+        setConnectors(nextConnectors || []);
+      }).catch(() => {});
+  }, []);
   return (
     <section className="run-center">
       <SurfaceHeader tone="cyan" eyebrow="低频工作区" title="运行中心" description="回看知识同步、Agent 写入和维护任务；Campaign 实验统一在 Canvas 中推进。" />
@@ -32,6 +43,7 @@ export function RunCenter({
           onStartSync={onStartKnowledgeSync}
           onControlJob={onControlKnowledgeJob}
         />
+        <AgentCapabilityStatus capabilities={capabilities} connectors={connectors} />
         <section>
           <header><ShieldCheck size={16} /><strong>待确认变更</strong><span>{changes.length} 项</span></header>
           {changes.map((item) => <ActivityRow key={item.id} tone="orange" icon={<ShieldCheck size={15} />} title={item.summary} meta={item.status === "conflicted" ? "存在冲突" : `${item.operations?.length || 0} 项修改`} description={item.risk === "high" ? "高风险变更，请逐字段检查。" : "等待用户确认后写入个人数据。"} actions={<ChevronRight size={15} />} onClick={() => onAction?.("changeset", item.id)} />)}
@@ -56,6 +68,35 @@ export function RunCenter({
           </details>
         </section>
       </div>
+    </section>
+  );
+}
+
+function AgentCapabilityStatus({ capabilities, connectors }) {
+  const levels = [
+    ["automatic_read", "自动读取"],
+    ["preview", "预览与导航"],
+    ["confirmed_write", "确认后写入"],
+    ["approved_execution", "批准后执行"]
+  ];
+  return (
+    <section className="agent-capability-status">
+      <header><Sparkles size={16} /><strong>Agent 能力</strong><span>{capabilities.filter((item) => item.available).length} 项可用</span></header>
+      <div className="connector-list" aria-label="搜索连接器">
+        {connectors.map((item) => (
+          <div key={item.id}><Globe2 size={13} /><span><strong>{item.id === "web" ? "通用网页" : item.id === "academic" ? "学术来源" : "本地研究库"}</strong><em>{item.available ? item.provider : item.reason}</em></span><StatusDot status={item.available ? "ready" : "idle"} /></div>
+        ))}
+      </div>
+      <div className="capability-levels">
+        {levels.map(([id, label]) => {
+          const items = capabilities.filter((item) => item.control_level === id);
+          return <div key={id}><span>{label}</span><strong>{items.filter((item) => item.available).length}</strong><em>{items.filter((item) => !item.available).map((item) => item.label).join("、") || "全部就绪"}</em></div>;
+        })}
+      </div>
+      <details className="run-center-advanced">
+        <summary>查看能力边界</summary>
+        <div className="capability-list">{capabilities.map((item) => <span key={item.id}><StatusDot status={item.available ? "ready" : "idle"} /><strong>{item.label}</strong><em>{item.available ? item.control_level : item.unavailable_reason}</em></span>)}</div>
+      </details>
     </section>
   );
 }

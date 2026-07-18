@@ -77,6 +77,10 @@ class AgentOperationService:
     def current_value(self, thread: ThreadDoc, operation: Any) -> Any:
         arguments = operation.arguments or {}
         capability = operation.capability
+        if capability == "project.create":
+            return self.store.get_record("project", safe_text(arguments.get("id"), 160))
+        if capability == "thread.create":
+            return self.store.get_record("thread", safe_text(arguments.get("id"), 160))
         if capability == "context.add":
             card = next((item for item in thread.context_cards if item.id == arguments.get("id")), None)
             return card.model_dump(mode="json") if card else None
@@ -114,6 +118,10 @@ class AgentOperationService:
         thread = self.workspace.load_thread(batch.thread_id)
         batch.base_revision = thread.revision
         for operation in batch.operations:
+            if operation.capability == "project.create" and not operation.arguments.get("id"):
+                operation.arguments["id"] = new_id("project")
+            if operation.capability == "thread.create" and not operation.arguments.get("id"):
+                operation.arguments["id"] = new_id("thread")
             if operation.capability == "context.add" and not operation.arguments.get("id"):
                 operation.arguments["id"] = new_id("card")
             operation.before = self.current_value(thread, operation)
@@ -170,7 +178,8 @@ class AgentOperationService:
         self,
         before: ThreadDoc,
         after: ThreadDoc,
-        projects: dict[str, ProjectDoc],
+        projects: dict[str, ProjectDoc | None],
+        threads: dict[str, ThreadDoc | None],
         memories: dict[tuple[str, str, str], ObjectMemory | None],
         atlas_docs: dict[str, AtlasUpdateDoc],
     ) -> list[dict[str, Any]]:
@@ -183,12 +192,22 @@ class AgentOperationService:
             "projection_target": f"threads/{before.id}.json",
         }]
         for project_id, project in projects.items():
-            project.updated_at = utc_now()
+            if project is not None:
+                project.updated_at = utc_now()
             mutations.append({
                 "kind": "project", "record_id": project_id,
                 "expected_payload": self.store.get_record("project", project_id),
-                "payload": project.model_dump(mode="json"),
+                "payload": project.model_dump(mode="json") if project is not None else None,
                 "projection_target": f"projects/{project_id}.json",
+            })
+        for thread_id, created_thread in threads.items():
+            if created_thread is not None:
+                created_thread.updated_at = utc_now()
+            mutations.append({
+                "kind": "thread", "record_id": thread_id,
+                "expected_payload": self.store.get_record("thread", thread_id),
+                "payload": created_thread.model_dump(mode="json") if created_thread is not None else None,
+                "projection_target": f"threads/{thread_id}.json",
             })
         for (atlas_id, object_type, object_id), memory in memories.items():
             record_id = f"{atlas_id}:{object_type}:{object_id}"
@@ -226,7 +245,13 @@ class AgentOperationService:
         return {"status": "applied", "operation_batch_id": batch.id, "transaction_id": batch.receipt.get("transaction_id", ""), "operations": batch.receipt.get("operations", []), "thread": thread.model_dump(mode="json"), "reconciled": True}
 
     def apply(self, batch: OperationBatch, resolution: ApprovalResolveRequest) -> dict[str, Any]:
-        del resolution
+        if resolution.decision != "approve":
+            return {
+                "status": "rejected",
+                "operation_batch_id": batch.id,
+                "transaction_id": "",
+                "operations": [],
+            }
         with self.thread_lock:
             thread = self.workspace.load_thread(batch.thread_id)
             reconciled = self._reconciled_apply(thread, batch)
@@ -241,13 +266,42 @@ class AgentOperationService:
             if conflicts: raise AgentOperationError(409, {"message": "操作目标发生变化", "conflicts": conflicts})
 
             updated = ThreadDoc.model_validate(thread.model_dump(mode="json"))
-            projects: dict[str, ProjectDoc] = {}
+            projects: dict[str, ProjectDoc | None] = {}
+            threads: dict[str, ThreadDoc | None] = {}
             memories: dict[tuple[str, str, str], ObjectMemory | None] = {}
             atlas_docs: dict[str, AtlasUpdateDoc] = {}
             promotions, applied = [], []
             for operation in batch.operations:
                 arguments, capability = operation.arguments or {}, operation.capability
-                if capability == "context.add":
+                if capability == "project.create":
+                    project_id = safe_text(arguments.get("id"), 160)
+                    now = utc_now()
+                    projects[project_id] = ProjectDoc(
+                        id=project_id,
+                        title=safe_text(arguments.get("title"), 240),
+                        goal=safe_text(arguments.get("goal"), 2000),
+                        default_atlas_id=safe_text(arguments.get("default_atlas_id") or "G", 80),
+                        created_at=now,
+                        updated_at=now,
+                    )
+                    applied.append({"capability": capability, "project_id": project_id})
+                elif capability == "thread.create":
+                    created_thread_id = safe_text(arguments.get("id"), 160)
+                    project_id = safe_text(arguments.get("project_id"), 160) or None
+                    if project_id and project_id not in projects and not self.store.get_record("project", project_id):
+                        raise AgentOperationError(409, "project not found")
+                    now = utc_now()
+                    threads[created_thread_id] = ThreadDoc(
+                        id=created_thread_id,
+                        project_id=project_id,
+                        title=safe_text(arguments.get("title"), 240),
+                        goal=safe_text(arguments.get("goal"), 2000),
+                        active_atlas_id=safe_text(arguments.get("active_atlas_id") or "G", 80),
+                        created_at=now,
+                        updated_at=now,
+                    )
+                    applied.append({"capability": capability, "thread_id": created_thread_id})
+                elif capability == "context.add":
                     card = ContextCard(
                         id=safe_text(arguments.get("id"), 160) or new_id("card"),
                         type=arguments.get("type") if arguments.get("type") in {"paper", "relation", "path", "file"} else "paper",
@@ -307,7 +361,7 @@ class AgentOperationService:
                     raise AgentOperationError(400, f"unsupported Agent v2 capability: {capability}")
 
             self._append_message(updated, Message(role="tool", kind="state", content=f"已应用 Agent v2 操作：{batch.summary}", surface="thread", refs={"agent_v2_task_id": batch.task_id, "operation_batch_id": batch.id}))
-            journal = self.store.apply_record_batch(self._mutations(thread, updated, projects, memories, atlas_docs))
+            journal = self.store.apply_record_batch(self._mutations(thread, updated, projects, threads, memories, atlas_docs))
             self.projector.replay(limit=max(20, len(journal) * 2))
             promoted = []
             try:
@@ -346,13 +400,18 @@ class AgentOperationService:
                 raise AgentOperationError(409, {"message": "目标在应用后发生变化，无法安全撤销", "conflicts": conflicts})
 
             updated = ThreadDoc.model_validate(thread.model_dump(mode="json"))
-            projects: dict[str, ProjectDoc] = {}
+            projects: dict[str, ProjectDoc | None] = {}
+            threads: dict[str, ThreadDoc | None] = {}
             memories: dict[tuple[str, str, str], ObjectMemory | None] = {}
             atlas_docs: dict[str, AtlasUpdateDoc] = {}
             promotions = []
             for operation in reversed(batch.operations):
                 arguments, capability = operation.arguments or {}, operation.capability
-                if capability == "context.add":
+                if capability == "project.create":
+                    projects[safe_text(arguments.get("id"), 160)] = None
+                elif capability == "thread.create":
+                    threads[safe_text(arguments.get("id"), 160)] = None
+                elif capability == "context.add":
                     card_id = safe_text(arguments.get("id"), 160); updated.context_cards = [item for item in updated.context_cards if item.id != card_id]
                 elif capability == "context.remove":
                     if operation.before:
@@ -395,7 +454,7 @@ class AgentOperationService:
                 except AgentOperationError:
                     pass
             self._append_message(updated, Message(role="tool", kind="state", content=f"已撤销 Agent v2 操作：{batch.summary}", surface="thread", refs={"agent_v2_task_id": batch.task_id, "operation_batch_id": batch.id, "undone": True}))
-            journal = self.store.apply_record_batch(self._mutations(thread, updated, projects, memories, atlas_docs))
+            journal = self.store.apply_record_batch(self._mutations(thread, updated, projects, threads, memories, atlas_docs))
             self.projector.replay(limit=max(20, len(journal) * 2))
             for draft_id in promotions: self.get_runtime().store.revert_promoted_memory(draft_id)
             batch.receipt = {**batch.receipt, "undo_projection_journal": journal}

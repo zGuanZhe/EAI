@@ -13,7 +13,7 @@ Home and Thread own the Composer. Atlas, paper reading, Canvas, Campaign and Run
 
 - React 19, Vite 7, TanStack Query, lucide-react and layered CSS.
 - `workspace/WorkspaceApp.jsx` assembles navigation, shared state and cross-surface actions.
-- `features/thread` owns Agent v2 streaming, activity, citations and approval entry points.
+- `features/thread` owns Agent v3 AskTurn/ResearchTask interaction, activity, citations and approval entry points.
 - `features/atlas` owns graph layout, deterministic relation routing and paper selection.
 - `features/canvas` owns argument projection and Campaign views.
 - `features/inspector` owns source, detail, approval and changeset drawers.
@@ -25,7 +25,7 @@ Do not reintroduce Agent v1 write hooks or a second Campaign chat. Do not render
 
 - `factory.py` builds FastAPI and middleware; `main.py` exposes the ASGI app.
 - `application.py` currently supplies compatibility assembly while domain modules are extracted.
-- `agent_v2` owns task state, routing, capability dispatch, context, providers, evidence policy and sandbox previews.
+- `agent_v3` owns AskTurn/ResearchTask lanes, ContextManifest and web connectors; the audited `agent_v2` runtime owns task state, capability dispatch, providers, evidence policy and sandbox previews.
 - `research` owns identity, evidence, indexing, graph retrieval and enrichment.
 - `campaign` owns ideas, branches, metrics, checkpoints, manuscripts, reviews and legacy Lab migration.
 - `legacy` owns historical AgentRun/ChangeSet models and read-only support.

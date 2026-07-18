@@ -69,6 +69,18 @@ def elapsed_seconds(created_at: str) -> float:
 
 
 def budget_for_request(request: AgentTurnRequest) -> TaskBudget:
+    if request.surface == "agent-v3:ask-search":
+        return TaskBudget(
+            max_rounds=2,
+            max_tool_calls=6,
+            max_specialists=2,
+            max_source_queries=6,
+            max_sources=24,
+            max_external_queries=3,
+            max_fulltext_imports=0,
+            max_parallel_reads=3,
+            max_runtime_seconds=60,
+        )
     if request.intent_override == "deep_research":
         return TaskBudget(
             max_rounds=8, max_tool_calls=20, max_specialists=8, max_source_queries=20,
@@ -99,6 +111,8 @@ def protocol_answer(raw: str) -> str:
 
 
 IMMUTABLE_OPERATION_ARGUMENTS = {
+    "project.create": {"id"},
+    "thread.create": {"id", "project_id"},
     "context.add": {"id", "source_ref"},
     "context.remove": {"card_id"},
     "project.update": {"project_id"},
@@ -201,6 +215,7 @@ class AgentRuntimeV2:
         )
         self._threads: dict[str, threading.Thread] = {}
         self._cancelled: set[str] = set()
+        self._paused: set[str] = set()
         self._lock = threading.RLock()
         self._closed = False
         self._checkpoint_connection = sqlite3.connect(
@@ -265,13 +280,84 @@ class AgentRuntimeV2:
         return task
 
     def _event(self, task_id: str, kind: str, payload: dict[str, Any]) -> None:
+        task = self.store.get_task(task_id)
+        if task and task.interaction_lane == "research":
+            raw_phase = str(payload.get("phase") or "")
+            capability_id = str(payload.get("capability") or "")
+            if kind in {"service_selected", "resumed"}:
+                raw_phase = "search_map"
+            elif kind == "paused":
+                raw_phase = "paused"
+            elif kind in {"capability_started", "capability_completed"}:
+                if capability_id in {"web.read", "documents.import_open", "knowledge.claim_evidence", "knowledge.work_profile"}:
+                    raw_phase = "read"
+                elif capability_id in {"knowledge.compare_works", "campaign.compare", "knowledge.inspect_gaps"}:
+                    raw_phase = "compare"
+                else:
+                    raw_phase = "gather"
+            elif kind == "answer_ready":
+                raw_phase = "guard"
+            elif kind == "done":
+                raw_phase = "report"
+            phase_map = {
+                "intake": "scope",
+                "context": "search_map",
+                "planning": "search_map",
+                "steer": "search_map",
+                "observation": "compare",
+                "synthesis": "synthesize",
+                "evidence_guard": "guard",
+                "policy": "report",
+                "verify": "report",
+                "paused": "paused",
+            }
+            normalized_phase = phase_map.get(raw_phase, raw_phase)
+            if normalized_phase:
+                payload = {**payload, "phase": normalized_phase}
+                if kind == "done" and isinstance(payload.get("task"), dict):
+                    payload["task"] = {**payload["task"], "phase": normalized_phase}
+        terminal_event = kind in {"paused", "resumed", "done", "error"}
+        if task and not terminal_event and (
+            task_id in self._cancelled
+            or task_id in self._paused
+            or task.status in {"cancelled", "paused"}
+        ):
+            raise RuntimeError(f"task {task.status}")
         self.store.append_event(task_id, kind, payload, utc_now())
+        phase = str(payload.get("phase") or "")
+        if task and task.interaction_lane == "research" and phase:
+            self._save_task(task, phase=phase)
+            if kind in {
+                "status", "service_selected", "capability_completed", "evidence_gap",
+                "answer_ready", "approval_required", "resumed", "done",
+            }:
+                self.store.save_research_checkpoint(task_id, phase, payload, utc_now())
 
-    def _save_task(self, task: AgentTask, **changes: Any) -> AgentTask:
-        for key, value in changes.items():
-            setattr(task, key, value)
-        task.updated_at = utc_now()
-        return self.store.save_task(task)
+    def _save_task(
+        self,
+        task: AgentTask,
+        *,
+        allow_generation_change: bool = False,
+        **changes: Any,
+    ) -> AgentTask:
+        with self._lock:
+            current = self.store.get_task(task.id)
+            if current:
+                if not allow_generation_change and current.active_attempt_id != task.active_attempt_id:
+                    raise RuntimeError("stale task generation")
+                if not allow_generation_change:
+                    for field in task.__class__.model_fields:
+                        setattr(task, field, getattr(current, field))
+            desired_status = str(changes.get("status") or (current.status if current else task.status))
+            if current:
+                if current.status == "cancelled" and desired_status != "cancelled":
+                    raise RuntimeError("task cancelled")
+                if current.status == "paused" and desired_status not in {"paused", "pending"}:
+                    raise RuntimeError("task paused")
+            for key, value in changes.items():
+                setattr(task, key, value)
+            task.updated_at = utc_now()
+            return self.store.save_task(task)
 
     def _ensure_active(self, task_id: str) -> AgentTask:
         if self._closed:
@@ -279,6 +365,8 @@ class AgentRuntimeV2:
         task = self._task(task_id)
         if task_id in self._cancelled or task.status == "cancelled":
             raise RuntimeError("task cancelled")
+        if task_id in self._paused or task.status == "paused":
+            raise RuntimeError("task paused")
         return task
 
     def create_task(
@@ -290,6 +378,11 @@ class AgentRuntimeV2:
         request: AgentTurnRequest,
         parent_task_id: str | None = None,
         task_id: str | None = None,
+        runtime_version: str = "2.1",
+        interaction_lane: str = "legacy",
+        context_manifest_id: str = "",
+        retrieval_decision: dict[str, Any] | None = None,
+        research_profile: dict[str, Any] | None = None,
     ) -> AgentTask:
         self.store.ensure_writable()
         now = utc_now()
@@ -301,6 +394,11 @@ class AgentRuntimeV2:
             turn_id=turn_id,
             assistant_message_id=assistant_message_id,
             parent_task_id=parent_task_id,
+            runtime_version=runtime_version,
+            interaction_lane=interaction_lane,
+            context_manifest_id=context_manifest_id,
+            retrieval_decision=retrieval_decision or {},
+            research_profile=research_profile or {},
             objective=clean_text(request.message, 600),
             input_payload=request.model_dump(mode="json"),
             active_attempt_id=attempt_id,
@@ -333,6 +431,26 @@ class AgentRuntimeV2:
             self._threads[task_id] = worker
             worker.start()
 
+    def _start_worker_when_idle(self, task_id: str, input_state: RuntimeState | Command) -> None:
+        with self._lock:
+            active = self._threads.get(task_id)
+            if not active or not active.is_alive():
+                self._start_worker(task_id, input_state)
+                return
+
+        def restart_after_previous() -> None:
+            active.join()
+            task = self.store.get_task(task_id)
+            if self._closed or not task or task.status != "pending":
+                return
+            self._start_worker(task_id, input_state)
+
+        threading.Thread(
+            target=restart_after_previous,
+            daemon=True,
+            name=f"eai-agent-resume-{task_id[-8:]}",
+        ).start()
+
     def _run_graph(self, task_id: str, input_state: RuntimeState | Command) -> None:
         try:
             result = self._graph.invoke(input_state, self._config(task_id))
@@ -345,8 +463,21 @@ class AgentRuntimeV2:
                     attempt.updated_at = utc_now()
                     self.store.save_attempt(attempt)
         except Exception as exc:
-            task = self.store.get_task(task_id)
-            if self._closed or not task or task.status == "cancelled":
+            if self._closed:
+                return
+            try:
+                task = self.store.get_task(task_id)
+            except sqlite3.ProgrammingError:
+                if self._closed:
+                    return
+                raise
+            if (
+                self._closed
+                or task_id in self._cancelled
+                or task_id in self._paused
+                or not task
+                or task.status in {"cancelled", "paused"}
+            ):
                 return
             message = safe_provider_error(exc) or "Agent Runtime v2 运行失败。"
             self._save_task(task, status="failed", error=message)
@@ -370,7 +501,8 @@ class AgentRuntimeV2:
                 pass
         finally:
             with self._lock:
-                self._threads.pop(task_id, None)
+                if self._threads.get(task_id) is threading.current_thread():
+                    self._threads.pop(task_id, None)
 
     def cancel(self, task_id: str) -> AgentTask:
         self.store.ensure_writable()
@@ -400,6 +532,24 @@ class AgentRuntimeV2:
         )
         return task
 
+    def pause(self, task_id: str) -> AgentTask:
+        self.store.ensure_writable()
+        task = self._task(task_id)
+        if task.interaction_lane != "research":
+            raise ValueError("only research tasks can be paused")
+        if task.status in self.TERMINAL or task.status == "paused":
+            return task
+        self._paused.add(task_id)
+        self._save_task(task, status="paused", phase="paused")
+        attempt = self.store.get_attempt(task.active_attempt_id)
+        if attempt:
+            attempt.status = "interrupted"
+            attempt.stop_reason = "user_paused"
+            attempt.updated_at = utc_now()
+            self.store.save_attempt(attempt)
+        self._event(task_id, "paused", {"status": "paused"})
+        return task
+
     def steer(self, task_id: str, message: str) -> AgentTask:
         self.store.ensure_writable()
         task = self._task(task_id)
@@ -415,7 +565,7 @@ class AgentRuntimeV2:
     def resume(self, task_id: str, resolution: ApprovalResolveRequest | None = None) -> AgentTask:
         self.store.ensure_writable()
         task = self._task(task_id)
-        if task.status not in {"waiting_approval", "interrupted", "failed", "done"}:
+        if task.status not in {"waiting_approval", "interrupted", "failed", "done", "paused"}:
             raise ValueError("task is not resumable")
         if task.status == "waiting_approval":
             command: RuntimeState | Command = Command(resume=(resolution or ApprovalResolveRequest(decision="reject")).model_dump(mode="json"))
@@ -459,8 +609,11 @@ class AgentRuntimeV2:
                 "error": "",
             }
         self._cancelled.discard(task_id)
-        self._save_task(task, status="pending", error="")
-        self._start_worker(task_id, command)
+        self._paused.discard(task_id)
+        self._save_task(task, allow_generation_change=True, status="pending", error="")
+        if task.interaction_lane == "research":
+            self._event(task_id, "resumed", {"status": "pending", "attempt": task.attempt})
+        self._start_worker_when_idle(task_id, command)
         return task
 
     def resolve_approval(self, approval_id: str, resolution: ApprovalResolveRequest) -> tuple[ApprovalRequest, AgentTask]:
@@ -661,6 +814,12 @@ class AgentRuntimeV2:
             calls = [ToolCallRequest(capability="atlas.search", arguments={"query": decision.objective, "atlas_id": atlas_id, "limit": 18}, rationale="只检索 Atlas 策展来源。")]
         else:
             calls = [ToolCallRequest(capability="knowledge.search", arguments={"query": decision.objective, "limit": 18}, rationale="先检索本地策展图、全文和研究状态。")]
+        if decision.source_policy in {"external_only", "local_and_external"} and self.sources.web.available:
+            calls.append(ToolCallRequest(
+                capability="web.search",
+                arguments={"query": decision.objective, "limit": 8},
+                rationale="补充公开网页来源。",
+            ))
         if decision.service == "document_reading" and decision.source_policy in {"local_only", "local_and_external"}:
             calls.append(ToolCallRequest(capability="documents.search", arguments={"query": decision.objective, "limit": 10}))
         if decision.source_policy == "local_and_external":
@@ -691,17 +850,17 @@ class AgentRuntimeV2:
 
         available = capability_specs(service=decision.service)
         if decision.source_policy not in {"external_only", "local_and_external"}:
-            available = [item for item in available if "network.academic" not in item.scopes]
+            available = [item for item in available if not any(scope.startswith("network.") for scope in item.scopes)]
         if decision.source_policy == "external_only":
-            available = [item for item in available if "network.academic" in item.scopes or item.permission == "write" or "ui" in item.scopes]
+            available = [item for item in available if any(scope.startswith("network.") for scope in item.scopes) or item.permission == "write" or "ui" in item.scopes]
         elif decision.source_policy == "atlas_only":
             available = [item for item in available if "atlas" in item.scopes or item.permission == "write" or "ui" in item.scopes]
         if usage.external_queries >= task.budget.max_external_queries:
-            available = [item for item in available if item.id != "sources.search_external"]
+            available = [item for item in available if item.id not in {"sources.search_external", "web.search"}]
         if usage.fulltext_imports >= task.budget.max_fulltext_imports:
             available = [item for item in available if item.id != "documents.import_open"]
         if usage.source_queries >= task.budget.max_source_queries:
-            available = [item for item in available if item.id not in {"knowledge.search", "documents.search", "sources.search_external"}]
+            available = [item for item in available if item.id not in {"knowledge.search", "documents.search", "sources.search_external", "web.search"}]
         remaining = task.budget.max_tool_calls - usage.tool_calls
         tools = [
             {
@@ -714,7 +873,12 @@ class AgentRuntimeV2:
             for item in available
         ]
         selected: ToolDecision | None = None
-        if self.dependencies.tool_model:
+        deterministic_search = (
+            task.interaction_lane == "ask"
+            and bool(task.retrieval_decision.get("search_required"))
+            and usage.rounds == 0
+        )
+        if self.dependencies.tool_model and not deterministic_search:
             prompt = json.dumps(
                 {
                     "instruction": (
@@ -765,9 +929,10 @@ class AgentRuntimeV2:
             specification = capability(item.capability)
             if not specification or not specification.available or decision.service not in specification.services:
                 raise ValueError(f"能力不允许用于当前服务：{item.capability}")
-            if decision.source_policy not in {"external_only", "local_and_external"} and "network.academic" in specification.scopes:
+            network_scoped = any(scope.startswith("network.") for scope in specification.scopes)
+            if decision.source_policy not in {"external_only", "local_and_external"} and network_scoped:
                 raise ValueError("本轮来源策略禁止外部网络能力")
-            if decision.source_policy == "external_only" and "network.academic" not in specification.scopes and specification.permission != "write" and "ui" not in specification.scopes:
+            if decision.source_policy == "external_only" and not network_scoped and specification.permission != "write" and "ui" not in specification.scopes:
                 raise ValueError("本轮来源策略禁止本地证据能力")
             if decision.source_policy == "atlas_only" and "atlas" not in specification.scopes and specification.permission != "write" and "ui" not in specification.scopes:
                 raise ValueError("本轮来源策略只允许 Atlas 证据能力")
@@ -831,9 +996,9 @@ class AgentRuntimeV2:
             if preview:
                 proposed.append(preview)
             usage.tool_calls += 1
-            if call.capability == "sources.search_external":
+            if call.capability in {"sources.search_external", "web.search"}:
                 usage.external_queries += 1
-            if call.capability in {"knowledge.search", "documents.search", "sources.search_external"}:
+            if call.capability in {"knowledge.search", "documents.search", "sources.search_external", "web.search"}:
                 usage.source_queries += 1
             if call.capability == "documents.import_open":
                 usage.fulltext_imports += 1
@@ -841,6 +1006,9 @@ class AgentRuntimeV2:
                 "id": call.id, "capability": call.capability, "status": observation.status,
                 "summary": observation.summary, "duration_ms": call.duration_ms,
             })
+            ui_command = observation.data.get("ui_command") if isinstance(observation.data, dict) else None
+            if isinstance(ui_command, dict):
+                self._event(task.id, "ui_command", ui_command)
         usage.sources = len(task.source_ids)
         self._save_task(task, budget_usage=usage)
         attempt = self.store.get_attempt(task.active_attempt_id)
@@ -916,7 +1084,8 @@ class AgentRuntimeV2:
                 "lab_runs": context.get("lab_runs") or [],
                 "long_term_memories": context.get("long_term_memories") or [],
                 "recent_messages": (context.get("recent_messages") or [])[-12:],
-                "attachments": request.turn_attachments[:8],
+                "attachments": context.get("turn_attachments") or [],
+                "observations": context.get("observations") or [],
                 "sources": source_payload,
                 "evidence_assessment": assessment,
                 "user_message": request.message,
@@ -940,7 +1109,7 @@ class AgentRuntimeV2:
         requirement = "论文全文" if assessment.get("requires_full_text") else "论文摘要或全文"
         available = []
         for source in sources[:6]:
-            available.append(f"- [S{len(available) + 1}] {source.title}（{evidence_label(source.evidence_level)}）")
+            available.append(f"- {source.title}（{evidence_label(source.evidence_level)}）")
         policy_note = "你要求仅使用 Atlas / 本地资料，因此本轮没有联网补取原文。" if assessment.get("source_policy") == "local_only" else "我已经检索相关学术源并尝试获取许可允许的开放全文，但目前仍未取得足够原文。"
         source_list = "\n\n当前找到的材料：\n" + "\n".join(available) if available else ""
         return (
@@ -992,7 +1161,13 @@ class AgentRuntimeV2:
         elif self.dependencies.stream_model:
             try:
                 iterator, provider, model = self.dependencies.stream_model(
-                    self._prompt(request, decision, state.get("context") or {}, sources, assessment),
+                    self._prompt(
+                        request,
+                        decision,
+                        decision_context(state.get("context_seed") or {}, list(state.get("observations") or []), decision),
+                        sources,
+                        assessment,
+                    ),
                     profile_for_service(decision.service),
                     request.model_overrides,
                     lambda: self._closed or task.id in self._cancelled,
@@ -1094,9 +1269,13 @@ class AgentRuntimeV2:
                     "label": f"结构化证据协议修复失败：{clean_text(exc, 120)}",
                     "phase": "evidence_guard", "tone": "warning",
                 })
-        answer = guarded.answer or self._fallback_answer(
-            AgentTurnRequest.model_validate(state["request"]), decision, sources, assessment
-        )
+        if guarded.guard_status in {"blocked", "invalid_draft"}:
+            answer = (
+                "本轮回答未通过引用核验，因此没有交付事实性正文。\n\n"
+                "检索和审计记录已经保留。你可以继续检索原始来源、导入相关 PDF，或缩小问题范围后重试。"
+            )
+        else:
+            answer = guarded.answer
         for warning in guarded.warnings:
             self._event(task.id, "evidence_gap", {"message": warning})
         for index in range(0, len(answer), 80):
@@ -1109,7 +1288,12 @@ class AgentRuntimeV2:
             "citation_count": len(guarded.cited_sources),
         })
         request = AgentTurnRequest.model_validate(state["request"])
-        memory_artifact = self._create_memory_draft(task, request, decision, answer)
+        memory_artifact = (
+            self._create_memory_draft(task, request, decision, answer)
+            if decision.service == "workspace_operation"
+            or guarded.guard_status not in {"blocked", "invalid_draft"}
+            else None
+        )
         return {
             "answer": answer,
             "citation_bindings": [item.model_dump(mode="json") for item in guarded.bindings],

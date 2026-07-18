@@ -138,13 +138,11 @@ with sync_playwright() as playwright:
     page.locator(".surface-nav-item.blue").click()
     composer = page.locator(".composer textarea")
     composer.wait_for(state="visible")
-    mode_select = page.locator(".composer-mode-select select")
-    assert mode_select.input_value() == "auto"
-    composer_box = composer.bounding_box()
-    mode_box = mode_select.bounding_box()
-    assert composer_box and mode_box
-    assert mode_box["x"] >= composer_box["x"] + composer_box["width"]
-    assert float(mode_select.evaluate("node => getComputedStyle(node).borderRadius.replace('px', '')")) >= 16
+    lane_switch = page.locator(".composer-lane-switch")
+    source_select = page.locator(".composer-source-select select")
+    assert lane_switch.get_by_role("button", name="询问").get_attribute("class") == "active"
+    assert source_select.input_value() == "local_and_external"
+    assert "不修改工作区" in page.locator(".composer-execution-summary").inner_text()
     page.locator(".sidebar-footer button").last.click()
     page.locator(".settings-drawer").wait_for(state="visible")
     page.locator(".ui-drawer-backdrop").click(position={"x": 8, "y": 8})
@@ -157,6 +155,19 @@ with sync_playwright() as playwright:
     assert "Agent Runtime v2 natural response." in greeting.inner_text()
     assert greeting.locator(".agent-run-trace").count() == 0
     assert greeting.locator(".agent-citations").count() == 0
+    page.locator(".composer-lane-switch").get_by_role("button", name="研究任务").click()
+    assert page.get_by_role("combobox", name="期望产物").input_value() == "research_note"
+    assert page.get_by_role("combobox", name="研究深度").input_value() == "standard"
+    composer.fill("Compare current robot learning evidence?")
+    composer.press("Enter")
+    page.locator(".research-task-shelf").wait_for(state="visible", timeout=10_000)
+    assert page.locator(".composer-run-actions .send-button.stop").count() == 0
+    research_task_id = current_agent_task_id(page)
+    page.locator(".composer-lane-switch").get_by_role("button", name="询问").click()
+    composer.fill("hello while research continues")
+    composer.press("Enter")
+    wait_for_new_agent(page, research_task_id)
+    assert page.locator(".research-task-shelf").is_visible()
     assert "个 Skill" not in greeting.inner_text()
 
     page.locator(".composer-context-chip").click()
@@ -258,7 +269,7 @@ with sync_playwright() as playwright:
     page.locator(".context-drawer .ui-drawer-header button").click()
 
     user_count = page.locator(".conversation-turn.user-turn").count()
-    page.locator(".composer-mode-select select").select_option("local")
+    page.locator(".composer-source-select select").select_option("local_only")
     previous_task_id = current_agent_task_id(page)
     composer.fill("请基于当前 Atlas 检索最相关的论文，并说明下一步。")
     composer.press("Enter")
@@ -310,7 +321,8 @@ with sync_playwright() as playwright:
     approval_paper.click()
     page.locator(".timeline-paper.selected .paper-node-actions button").first.click()
     page.locator(".agent-thread-surface").wait_for(state="visible")
-    page.locator(".composer-mode-select select").select_option("auto")
+    page.locator(".composer-lane-switch").get_by_role("button", name="询问").click()
+    page.locator(".composer-source-select select").select_option("local_and_external")
     composer = page.locator(".composer textarea")
     composer.fill("把这篇论文保存为长期资料")
     composer.press("Enter")
@@ -482,6 +494,18 @@ with sync_playwright() as playwright:
     assert_no_horizontal_overflow(narrow)
     narrow.screenshot(path=str(RESULTS / "run-center-narrow.png"))
     assert narrow.locator(".lab-workspace").count() == 0
+
+    for width in (900, 1119, 1120, 1440):
+        responsive = browser.new_page(viewport={"width": width, "height": 900})
+        responsive.goto(BASE_URL, wait_until="networkidle")
+        assert_no_horizontal_overflow(responsive)
+        responsive.close()
+
+    zoomed = browser.new_page(viewport={"width": 720, "height": 900})
+    zoomed.goto(BASE_URL, wait_until="networkidle")
+    assert_no_horizontal_overflow(zoomed)
+    assert zoomed.locator(".sidebar").bounding_box()["width"] <= 66
+    zoomed.close()
 
     reduced_context = browser.new_context(viewport={"width": 1440, "height": 900}, reduced_motion="reduce")
     reduced = reduced_context.new_page()

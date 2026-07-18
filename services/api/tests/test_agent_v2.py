@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import io
 import os
+import sqlite3
 import tempfile
 import time
 import unittest
@@ -678,6 +679,30 @@ class AgentRuntimeV2Test(unittest.TestCase):
         self.assertEqual(rows[0]["document_id"], document.id)
         store.close()
 
+    def test_runtime_schema_upgrade_restores_backup_on_initialize_failure(self):
+        runtime_dir = Path(self.temp.name) / "runtime-upgrade-failure"
+        runtime_dir.mkdir(parents=True)
+        database = runtime_dir / "runtime.db"
+        connection = sqlite3.connect(database)
+        connection.execute("CREATE TABLE legacy_marker(value TEXT NOT NULL)")
+        connection.execute("INSERT INTO legacy_marker(value) VALUES('preserve-me')")
+        connection.commit()
+        connection.close()
+
+        with patch.object(RuntimeStore, "_initialize", side_effect=RuntimeError("migration failed")):
+            with self.assertRaisesRegex(RuntimeError, "migration failed"):
+                RuntimeStore(runtime_dir)
+
+        restored = sqlite3.connect(database)
+        try:
+            self.assertEqual(restored.execute("SELECT value FROM legacy_marker").fetchone()[0], "preserve-me")
+            self.assertIsNone(restored.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='runtime_meta'"
+            ).fetchone())
+        finally:
+            restored.close()
+        self.assertTrue((runtime_dir / "runtime.schema-1.backup.db").exists())
+
     def test_source_dedup_prefers_full_text(self):
         store = RuntimeStore(Path(self.temp.name) / "source-runtime")
         service = SourceService(store, lambda _: {"papers": []})
@@ -914,6 +939,55 @@ class AgentRuntimeV2Test(unittest.TestCase):
         saved = main.load_thread(thread["id"])
         self.assertEqual(saved.title, "Conflict target")
         self.assertEqual(saved.goal, "Concurrent user goal")
+
+    def test_operation_batch_creates_project_and_thread_with_reject_and_safe_undo(self):
+        thread = self.create_thread("Capability control target")
+        now = main.utc_now()
+        batch = OperationBatch(
+            id="batch-create-workspace",
+            task_id="task-create-workspace",
+            thread_id=thread["id"],
+            summary="Create a scoped research workspace",
+            operations=[
+                Operation(
+                    id="operation-create-project",
+                    capability="project.create",
+                    arguments={"id": "project-agent-created", "title": "Agent project", "goal": "Testable goal"},
+                ),
+                Operation(
+                    id="operation-create-thread",
+                    capability="thread.create",
+                    arguments={
+                        "id": "thread-agent-created",
+                        "project_id": "project-agent-created",
+                        "title": "Agent thread",
+                        "goal": "Independent question",
+                    },
+                ),
+            ],
+            created_at=now,
+            updated_at=now,
+        )
+        prepared = main.v2_prepare_operation_batch(batch)
+        rejected = main.v2_apply_operation_batch(
+            prepared.model_copy(deep=True), ApprovalResolveRequest(decision="reject")
+        )
+        self.assertEqual(rejected["status"], "rejected")
+        self.assertIsNone(main.get_research_store().get_record("project", "project-agent-created"))
+        self.assertIsNone(main.get_research_store().get_record("thread", "thread-agent-created"))
+
+        applied = main.v2_apply_operation_batch(prepared, ApprovalResolveRequest(decision="approve"))
+        self.assertEqual(applied["status"], "applied")
+        self.assertEqual(main.load_project("project-agent-created").goal, "Testable goal")
+        self.assertEqual(main.load_thread("thread-agent-created").project_id, "project-agent-created")
+        self.assertTrue(prepared.receipt["projection_journal"])
+
+        response = self.client.post(
+            f"/api/vnext/agent-v2/operation-batches/{prepared.id}/undo", json={}
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertIsNone(main.get_research_store().get_record("project", "project-agent-created"))
+        self.assertIsNone(main.get_research_store().get_record("thread", "thread-agent-created"))
 
     def test_operation_batch_undo_refuses_changed_target(self):
         thread = self.create_thread("Undo conflict")

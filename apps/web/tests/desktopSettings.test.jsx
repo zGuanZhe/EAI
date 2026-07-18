@@ -24,7 +24,9 @@ describe("DesktopSettings", () => {
         provider: "openai",
         base_url: "https://api.openai.com/v1",
         model: "gpt-4.1-mini",
-        api_format: "responses"
+        api_format: "responses",
+        web_search_provider: "",
+        web_search_base_url: ""
       });
       return Promise.resolve({ mode: "desktop" });
     });
@@ -46,7 +48,10 @@ describe("DesktopSettings", () => {
       baseUrl: "http://127.0.0.1:8317/v1",
       model: "grok-4.5",
       apiFormat: "chat",
-      secret: "local-test-key"
+      secret: "local-test-key",
+      webSearchProvider: "",
+      webSearchBaseUrl: "",
+      webSearchSecret: null
     }));
     expect(invoke.mock.calls.filter(([command]) => command === "restart_backend")).toHaveLength(0);
     expect(refreshed).toHaveBeenCalledOnce();

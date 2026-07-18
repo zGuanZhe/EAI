@@ -1,21 +1,26 @@
-# EAI Desktop 0.5 Development Handoff
+# EAI Desktop 1.0 Development Handoff
 
 ## Start Here
 
-The active workspace is `D:\Test\GUAN\EAI`. The former `EAI-Desktop` repository is a read-only source archive and is not a build dependency. This repository has an empty personal seed and is compatible with the installed identifier `com.eai.desktop`.
+This repository is the complete active workspace and has no dependency on former experimental checkouts. It has an empty personal seed and remains compatible with the installed identifier `com.eai.desktop`.
 
 ## Runtime State
 
-- Main Agent is v2.1. New turns use the conditional `decide -> capability -> observe` loop, steer, attempts, replayable SSE, Evidence Guard, approvals and OperationBatch.
+- Agent v3 is the product entry. AskTurn and ResearchTask are independent lanes over the existing audited runtime graph.
+- Informational asks search every allowed available source; greetings and text transformations do not search. Generic web search is independent from the OpenAI-compatible model channel and supports SearXNG, Brave and Tavily.
+- ResearchTask persists ContextManifest and checkpoint history, supports targeted steer/pause/resume/cancel, keeps the Composer available, and promotes to Campaign only through an explicit command.
+- Runtime schema 2 adds `context_manifests`, `research_checkpoints`, and `ui_commands`. A higher research or runtime schema forces the whole application into structured read-only mode.
+
+- Agent v3 is the user-facing entry over the audited v2 runtime engine. New turns use the conditional `decide -> capability -> observe` loop, steer, attempts, replayable SSE, Evidence Guard, approvals and OperationBatch.
 - Plain conversation uses zero capabilities and zero sources. Research context starts small and expands through registered capabilities.
 - Research Store owns canonical Works, Atlas placements, claims, evidence spans, graph relations and personal research state in `research.db`.
 - Agent task/event/checkpoint/approval state remains physically separate in `runtime.db`.
 - Canvas exposes argument and Campaign views. Campaign uses the pinned AI Scientist v2 derivative for evidence preparation, progressive experiment branches, writing, three-role review, revision and release validation.
 - Legacy AgentRun and ChangeSet data remain readable. Legacy LabRun is hash-migrated to an archived manual Campaign. Legacy mutation APIs return `410 Gone`.
 - Schema 4 is active. SQLite is canonical; JSON is an outbox-driven compatibility projection with pending/failed replay, not part of a cross-medium transaction.
-- The only official downgrade bridge is 0.4.1, which opens newer schema read-only and rejects durable writes with structured `409 schema_newer_than_app`.
+- v1.0 is the first supported public desktop release. Downgrade to experimental 0.x builds is unsupported; users should retain an AppData backup before changing major versions. Higher research/runtime schemas still force structured read-only mode.
 
-## Structural Changes Toward 0.5
+## Structural Changes Through 1.0
 
 - `apps/web/src/App.jsx` is only the application entry; workspace and extracted Atlas/Inspector features live in dedicated modules.
 - Obsolete v1 execution hooks were removed. Historical `AgentRunTrace` remains display-only.
@@ -40,17 +45,16 @@ Completed in the new workspace:
 
 - clean `npm ci` and repository-local Python bootstrap
 - UTF-8/architecture checks
-- 24-test frontend Vitest suite and production build
-- 83-test FastAPI suite, including Agent v2, Research Store, Campaign, synthetic legacy fixtures, canonical batch rollback, projection failure, runtime receipt reconciliation and `410` compatibility
+- 26-test frontend Vitest suite and production build
+- 102-test FastAPI suite, including Agent v3 dual-lane routing, Research Store, Campaign, synthetic legacy fixtures, canonical batch rollback, projection failure, runtime receipt reconciliation and `410` compatibility
 - isolated Playwright coverage at desktop, medium and narrow widths
 - Campaign Docker fixture, with execution isolated in Docker and no host fallback
 - freshly built PyInstaller sidecar smoke on a random port
-- Rust fmt, Clippy with warnings denied, and four desktop data-path/provider-config tests
-- current 0.5.0 NSIS isolated install/start/close/uninstall smoke
-- historical NSIS 0.4.0 isolated install/start/close/uninstall smoke
+- Rust fmt, Clippy with warnings denied, and five desktop data-path/provider-config tests
+- 1.0.0 PyInstaller, Tauri release and NSIS isolated install/start/close/uninstall smoke
 - real `%APPDATA%\com.eai.desktop` SHA-256 tree unchanged before and after installed-app smoke
 
-The historical installer metadata and current 0.5 release gaps are recorded in `docs/VALIDATION.md`. Do not describe 0.5 as released until those gaps close.
+The source and installed-app gates for v1.0 are recorded in `docs/VALIDATION.md`. The final installer passed isolated install/start/normal-close/uninstall smoke. Real Provider acceptance is environment-dependent and is not represented by offline fixtures.
 
 ## Known Constraints
 
@@ -58,10 +62,10 @@ The historical installer metadata and current 0.5 release gaps are recorded in `
 - Full Campaign execution requires Docker. Without Docker, ideation, plans and command previews remain available but execution is disabled.
 - The NSIS package is unsigned and has no automatic updater.
 - AI Scientist v2 is pinned at `96bd51617cfdbb494a9fc283af00fe090edfae48`; preserve its LICENSE and EAI derivation notice.
-- A Web E2E run once timed out waiting for an Agent resumed stream and passed on immediate isolated rerun. Treat recurrence as an SSE/terminal-state race, not as an ignorable failure.
+- Agent v3 routes explicit workspace actions before retrieval. The attached-paper “保存为长期资料” regression now reaches OperationBatch approval without invoking academic or web connectors; negated actions remain read-only.
 
 ## Next Priorities
 
-1. Run the schema 3 -> 4 backup/restore report and the packaged 0.4.1 schema 4 read-only downgrade/reopen exercise.
-2. Begin the next major upgrade from `ApplicationAssembly` and the domain service boundaries without moving domain behavior back into `application.py`.
-3. Complete packaged 0.4.1 downgrade and 0.5 upgrade/downgrade recovery exercises, then run the restricted 20-query real Provider citation audit.
+1. Add code signing and an automatic updater for future Windows releases.
+2. Expand real-provider acceptance across OpenAI-compatible endpoints and supported web connectors without storing credentials or raw responses.
+3. Preserve runtime/research read-only compatibility before any future schema increase.

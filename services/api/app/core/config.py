@@ -15,7 +15,7 @@ class ApplicationConfig:
     secret_candidates: tuple[Path | None, ...]
 
     @classmethod
-    def load(cls, default_root: Path, *, service_version: str = "0.5.0") -> "ApplicationConfig":
+    def load(cls, default_root: Path, *, service_version: str = "1.0.0") -> "ApplicationConfig":
         paths = resolve_runtime_paths(default_root)
         return cls(
             service_version=service_version,
@@ -29,7 +29,7 @@ class ApplicationConfig:
         cls,
         paths: RuntimePaths,
         *,
-        service_version: str = "0.5.0",
+        service_version: str = "1.0.0",
         secret_paths: tuple[Path | None, ...] = (),
     ) -> "ApplicationConfig":
         return cls(

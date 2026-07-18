@@ -13,7 +13,7 @@ class DraftAttachmentRef(BaseModel):
 class ThreadDraftPut(BaseModel):
     expected_revision: int = Field(default=0, ge=0)
     text: str = Field(default="", max_length=8000)
-    agent_mode: Literal["auto", "chat", "local", "deep_research", "execute"] = "auto"
+    agent_mode: Literal["auto", "chat", "local", "deep_research", "execute", "ask", "research"] = "ask"
     attachment_refs: list[DraftAttachmentRef] = Field(default_factory=list, max_length=8)
 
 
