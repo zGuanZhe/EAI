@@ -109,6 +109,12 @@ for path in sorted(APP.rglob("*.py")):
         if direct_repository and rel not in DIRECT_REPOSITORY_ROUTER_ALLOWLIST:
             FAILURES.append(f"{rel}: routers must call services instead of repositories/stores directly")
 
+    if rel.startswith("routers/"):
+        allowed_roots = ("__future__", "fastapi", "collections", "pathlib", "typing", "..schemas", "..services")
+        for module in modules:
+            if not module.startswith(allowed_roots):
+                FAILURES.append(f"{rel}: router dependency '{module}' must go through schemas or services")
+
     if rel.startswith(("agent_v2/", "research/", "campaign/")) and any("legacy" in module.split(".") for module in modules):
         FAILURES.append(f"{rel}: hot-path domains must not import legacy compatibility code")
 

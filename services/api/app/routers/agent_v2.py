@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
-from ..agent_v2.models import (
+from ..schemas.agent_v2 import (
     AgentSteerRequest,
     AgentTurnRequest,
     AgentTurnResponse,
