@@ -24,7 +24,7 @@ The active workspace is `D:\Test\GUAN\EAI`. The former `EAI-Desktop` repository 
 - Architecture checks prevent old workspace paths, hot-path regressions, and version drift.
 - Desktop AppData can be overridden only in explicit test mode, enabling isolated install smoke without touching real user data.
 - Workspace server state now uses React Query keys; thread detail remains local because SSE patches it incrementally. Atlas switching, knowledge polling and runtime refresh no longer use request counters or ad hoc timers.
-- Workspace, Draft, System and Atlas/Object Memory use explicit router/service boundaries. Architecture checks validate dependency direction and registered routers rather than treating file size as the primary metric.
+- Workspace, Draft, System, Atlas/Object Memory and Agent v2/source/document APIs use explicit router/service boundaries. Agent API orchestration and its shared thread lock are lifespan-owned. Architecture checks validate dependency direction and registered routers rather than treating file size as the primary metric.
 - SourcePolicy, fail-closed AnswerDraft/Evidence Guard, revisioned drafts, PDF locator normalization, page render budgets, cancellation isolation and non-blocking SSE are implemented and covered offline.
 
 ## Validation Status
@@ -54,7 +54,7 @@ The historical installer metadata and current 0.5 release gaps are recorded in `
 
 ## Next Priorities
 
-1. Continue extracting Agent v2/source/document and legacy read routers without changing frozen OpenAPI/SSE/409/410 contracts.
+1. Extract legacy AgentRun/ChangeSet compatibility and Task Pack/Result routers without changing frozen OpenAPI/SSE/409/410 contracts.
 2. Remove dead compatibility implementations only after their callers use services and the full gates are green.
 3. Run the schema 3 -> 4 backup/restore report and the 0.4.1 schema 4 read-only downgrade/reopen exercise.
 4. Complete sidecar, Rust, PyInstaller and NSIS release gates, then run the restricted 20-query real Provider citation audit.
