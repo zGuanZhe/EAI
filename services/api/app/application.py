@@ -68,8 +68,6 @@ from .research.router import create_research_router
 from .research.store import ResearchStore
 
 SERVICE_VERSION = "0.5.0"
-AGENT_EVENT_BUFFERS: dict[str, list[dict[str, Any]]] = {}
-CANCELLED_AGENT_RUNS: set[str] = set()
 DEFAULT_ROOT = Path(__file__).resolve().parents[3]
 RUNTIME_PATHS = resolve_runtime_paths(DEFAULT_ROOT)
 ROOT = RUNTIME_PATHS.root
@@ -1955,7 +1953,7 @@ def sse_event(event: str, data: dict[str, Any]) -> str:
 def emit_agent_event(run: AgentRun, event: str, data: dict[str, Any]) -> str:
     run.event_seq += 1
     payload = {**scrub_refs(data), "seq": run.event_seq}
-    buffer = AGENT_EVENT_BUFFERS.setdefault(run.id, [])
+    buffer = APP_SERVICES.legacy_agent_event_buffers.setdefault(run.id, [])
     buffer.append({"event": event, "data": payload})
     if len(buffer) > 240:
         del buffer[:-240]
@@ -2024,7 +2022,7 @@ def stream_agent_run_events(thread_id: str, run_id: str, model: str | None = Non
     run = find_agent_run(doc, run_id)
     if retry:
         run.attempt += 1
-        CANCELLED_AGENT_RUNS.discard(run.id)
+        APP_SERVICES.cancelled_legacy_agent_runs.discard(run.id)
     assistant = reset_agent_run_for_stream(doc, run)
     user_message = find_message(doc, run.user_message_id)
     raw_chunks: list[str] = []
@@ -2041,7 +2039,7 @@ def stream_agent_run_events(thread_id: str, run_id: str, model: str | None = Non
         yield emit_agent_event(run, "step", step.model_dump(mode="json"))
 
     try:
-        if run.id in CANCELLED_AGENT_RUNS:
+        if run.id in APP_SERVICES.cancelled_legacy_agent_runs:
             raise InterruptedError("run cancelled")
         run.status = "planning"
         run.steps = agent_steps(active="tools")
@@ -2059,7 +2057,7 @@ def stream_agent_run_events(thread_id: str, run_id: str, model: str | None = Non
                 {"tool_call_id": call.id, "summary": call.result_summary or call.error, "source_ids": call.source_ids},
             )
 
-        if run.id in CANCELLED_AGENT_RUNS:
+        if run.id in APP_SERVICES.cancelled_legacy_agent_runs:
             raise InterruptedError("run cancelled")
         run.status = "running"
         run.steps = agent_steps(active="answer")
@@ -2069,7 +2067,7 @@ def stream_agent_run_events(thread_id: str, run_id: str, model: str | None = Non
         for chunk in chunk_iter:
             if not chunk:
                 continue
-            if run.id in CANCELLED_AGENT_RUNS:
+            if run.id in APP_SERVICES.cancelled_legacy_agent_runs:
                 raise InterruptedError("run cancelled")
             raw_chunks.append(chunk)
         raw_text = "".join(raw_chunks)
@@ -2138,7 +2136,7 @@ def stream_agent_run_events(thread_id: str, run_id: str, model: str | None = Non
         run.status = "cancelled"
         assistant.status = "done"
         assistant.refs = {**(assistant.refs or {}), "cancelled": True}
-    CANCELLED_AGENT_RUNS.discard(run.id)
+    APP_SERVICES.cancelled_legacy_agent_runs.discard(run.id)
     updated = merge_agent_completion(doc, run, assistant)
     final_run = find_agent_run(updated, run.id)
     final_assistant = find_message(updated, assistant.id or "")
@@ -2268,7 +2266,7 @@ def replay_agent_run_events(thread_id: str, run_id: str, after_seq: int = 0) -> 
     run = find_agent_run(doc, run_id)
 
     def replay() -> Iterator[str]:
-        buffered = [item for item in AGENT_EVENT_BUFFERS.get(run_id, []) if int(item.get("data", {}).get("seq", 0)) > after_seq]
+        buffered = [item for item in APP_SERVICES.legacy_agent_event_buffers.get(run_id, []) if int(item.get("data", {}).get("seq", 0)) > after_seq]
         if buffered:
             for item in buffered:
                 yield sse_event(str(item.get("event") or "step"), item.get("data") or {})
@@ -2301,7 +2299,7 @@ def cancel_agent_run(thread_id: str, run_id: str) -> AgentRunResponse:
     if run.status not in {"pending", "planning", "running"}:
         assistant = find_message(doc, run.assistant_message_id)
         return AgentRunResponse(thread=doc, run=run, assistant_message=assistant, degraded=False)
-    CANCELLED_AGENT_RUNS.add(run_id)
+    APP_SERVICES.cancelled_legacy_agent_runs.add(run_id)
     run.status = "cancelled"
     run.updated_at = utc_now()
     run.error = "用户停止了本轮运行"

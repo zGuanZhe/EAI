@@ -22,6 +22,13 @@ ROUTE_ALLOWLIST = {
     "routers/agent_v2.py",
 }
 DIRECT_REPOSITORY_ROUTER_ALLOWLIST = {"research/router.py"}
+APPLICATION_CONFIG_GLOBALS = {
+    "THREAD_CHAT_ACTIONS",
+    "RESEARCH_TEMPLATES",
+    "TEMPLATE_INSTRUCTIONS",
+    "NODE_LABELS",
+    "EDGE_LABELS",
+}
 
 
 def relative(path: Path) -> str:
@@ -74,6 +81,18 @@ for path in sorted(APP.rglob("*.py")):
         FAILURES.append(f"{rel}: HTTP routes belong in registered router modules")
     if rel == "application.py":
         application_route_count = route_count
+        for node in tree.body:
+            if isinstance(node, ast.Assign):
+                names = [target.id for target in node.targets if isinstance(target, ast.Name)]
+                value = node.value
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                names = [node.target.id]
+                value = node.value
+            else:
+                continue
+            for name in names:
+                if value is not None and mutable_literal(value) and name not in APPLICATION_CONFIG_GLOBALS:
+                    FAILURES.append(f"{rel}:{node.lineno}: mutable runtime state '{name}' must live in AppServices")
 
     if rel.startswith("services/") and any(module.lstrip(".").startswith(("fastapi", "starlette")) for module in modules):
         FAILURES.append(f"{rel}: service modules must not depend on FastAPI or Starlette")

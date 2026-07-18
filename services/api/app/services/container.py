@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from ..agent_v2.runtime import AgentRuntimeV2
 from .agent_api import AgentApiService
@@ -17,6 +18,8 @@ class AppServices:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self.agent_thread_lock = threading.RLock()
+        self.legacy_agent_event_buffers: dict[str, list[dict[str, Any]]] = {}
+        self.cancelled_legacy_agent_runs: set[str] = set()
         self._research_signature: tuple[Path, Path, Path] | None = None
         self._runtime_signature: tuple[Path, bool, int] | None = None
         self._research_store: ResearchStore | None = None
@@ -110,6 +113,8 @@ class AppServices:
             self._research_signature = None
 
     def _close_runtime_locked(self) -> None:
+        self.legacy_agent_event_buffers.clear()
+        self.cancelled_legacy_agent_runs.clear()
         self._agent_api = None
         self._campaign = None
         if self._agent_runtime is not None:

@@ -25,6 +25,7 @@ The active workspace is `D:\Test\GUAN\EAI`. The former `EAI-Desktop` repository 
 - Desktop AppData can be overridden only in explicit test mode, enabling isolated install smoke without touching real user data.
 - Workspace server state now uses React Query keys; thread detail remains local because SSE patches it incrementally. Atlas switching, knowledge polling and runtime refresh no longer use request counters or ad hoc timers.
 - Workspace, Draft, System, Atlas/Object Memory and Agent v2/source/document APIs use explicit router/service boundaries. Agent API orchestration and its shared thread lock are lifespan-owned. Architecture checks validate dependency direction and registered routers rather than treating file size as the primary metric.
+- Legacy Agent event replay buffers and cancellation markers are also AppServices-owned and cleared with the runtime; the AST gate rejects new mutable runtime containers in `application.py` outside a fixed static-configuration allowlist.
 - SourcePolicy, fail-closed AnswerDraft/Evidence Guard, revisioned drafts, PDF locator normalization, page render budgets, cancellation isolation and non-blocking SSE are implemented and covered offline.
 
 ## Validation Status
