@@ -149,7 +149,15 @@ export function Sidebar({
                 )}
               </article>
             ))}
-            <button className="project-new" type="button" onClick={onCreateProject} disabled={readOnly}>
+            <button
+              className="project-new"
+              type="button"
+              onClick={() => {
+                setProjectPickerOpen(false);
+                onCreateProject();
+              }}
+              disabled={readOnly}
+            >
               <Plus size={14} /> 新建成果目标
             </button>
           </div>

@@ -53,6 +53,7 @@ import { DesktopSettings } from "../features/settings/DesktopSettings.jsx";
 import { RunCenter } from "../features/tools/RunCenter.jsx";
 import { AgentApprovalInspector } from "../features/inspector/AgentApprovalInspector.jsx";
 import { ConfirmDialog, RightRail } from "../features/inspector/RightRail.jsx";
+import { WorkspaceCreateDialog } from "../features/workspace/WorkspaceCreateDialog.jsx";
 import { InlineNotice } from "../components/ui/index.jsx";
 import { useNotifications } from "../app/Notifications.jsx";
 import { Sidebar } from "../layout/Sidebar.jsx";
@@ -238,6 +239,8 @@ export function App() {
   const [activeProposalId, setActiveProposalId] = useState(null);
   const [activeChangesetId, setActiveChangesetId] = useState(null);
   const [atlasFocusPaperId, setAtlasFocusPaperId] = useState(null);
+  const [bootstrapped, setBootstrapped] = useState(false);
+  const [createDialog, setCreateDialog] = useState(null);
   const researchReadOnly = Boolean(systemInfo?.research_store?.read_only);
   useEffect(() => {
     if (!status || status === "就绪" || status.startsWith("正在")) return;
@@ -365,17 +368,6 @@ export function App() {
       api("/system/info").catch(() => null),
       api("/knowledge/status").catch(() => null)
     ]);
-    if (!projectList.length) {
-      const createdProject = await api("/projects", {
-        method: "POST",
-        body: JSON.stringify({
-          title: "我的研究成果",
-          goal: "沉淀一个可持续推进的研究成果目标。",
-          default_atlas_id: "G"
-        })
-      });
-      projectList = [createdProject];
-    }
     setAtlases(atlasList);
     setProjects(projectList);
     setSecrets(secretStatus);
@@ -387,19 +379,12 @@ export function App() {
       setActiveProjectId(threadList[0].project_id || "unfiled");
       await openThread(threadList[0].id, "home");
     } else {
-      const created = await api("/threads", {
-        method: "POST",
-        body: JSON.stringify({
-          title: "新的研究问题",
-          goal: "围绕成果目标收集图谱证据，并导出可交给 Codex 的上下文包。",
-          active_atlas_id: projectList[0]?.default_atlas_id || "G",
-          project_id: projectList[0]?.id
-        })
-      });
-      setThreads([created]);
-      setThread(created);
-      setActiveProjectId(created.project_id || "unfiled");
+      setThreads([]);
+      setThread(null);
+      if (projectList.length) setActiveProjectId(projectList[0].id);
+      setCreateDialog({ kind: projectList.length ? "thread" : "project", required: true });
     }
+    setBootstrapped(true);
     setStatus("就绪");
   }
 
@@ -435,35 +420,44 @@ export function App() {
     setStatus(`已打开：${displayThreadTitle(doc.title)}`);
   }
 
-  async function createThread() {
+  async function createThread({ title, goal, atlasId }) {
     const currentProject = projects.find((project) => project.id === activeProjectId);
     const created = await api("/threads", {
       method: "POST",
       body: JSON.stringify({
-        title: "新的研究问题",
-        goal: "围绕当前成果目标收集图谱证据，并导出可执行上下文。",
-        active_atlas_id: currentProject?.default_atlas_id || thread?.active_atlas_id || "G",
+        title,
+        goal,
+        active_atlas_id: atlasId || currentProject?.default_atlas_id || thread?.active_atlas_id || "G",
         project_id: activeProjectId === "unfiled" ? null : activeProjectId
       })
     });
     await refreshThreads();
     setThread(created);
+    setActiveProjectId(created.project_id || "unfiled");
     setSurface("home");
-    setStatus("已新建研究问题");
+    setCreateDialog(null);
+    setStatus(`已新建研究问题：${title}`);
+    return created;
   }
 
-  async function createProject() {
+  async function createProject({ title, goal, atlasId }) {
     const created = await api("/projects", {
       method: "POST",
       body: JSON.stringify({
-        title: "新的成果目标",
-        goal: "定义一个需要持续推进的研究产出。",
-        default_atlas_id: thread?.active_atlas_id || "G"
+        title,
+        goal,
+        default_atlas_id: atlasId || thread?.active_atlas_id || "G"
       })
     });
     await refreshProjects();
     setActiveProjectId(created.id);
-    setStatus("已新建成果目标");
+    if (!thread && createDialog?.required) {
+      setCreateDialog({ kind: "thread", required: true });
+    } else {
+      setCreateDialog(null);
+    }
+    setStatus(`已新建成果目标：${title}`);
+    return created;
   }
 
   function switchProject(projectId) {
@@ -529,7 +523,8 @@ export function App() {
     if (nextThread) {
       await openThread(nextThread.id, "home");
     } else {
-      await createThread();
+      setThread(null);
+      setCreateDialog({ kind: "thread", required: true });
     }
   }
 
@@ -1524,9 +1519,26 @@ export function App() {
   );
   const activeProject = projectOptions.find((project) => project.id === activeProjectId) || projectOptions[0];
   const isHome = surface === "home" && !toolsPage;
+  const createDialogElement = createDialog ? (
+    <WorkspaceCreateDialog
+      key={`${createDialog.kind}-${createDialog.required ? "required" : "optional"}`}
+      kind={createDialog.kind}
+      atlases={atlases}
+      defaultAtlasId={createDialog.kind === "project" ? thread?.active_atlas_id || "G" : activeProject?.default_atlas_id || thread?.active_atlas_id || "G"}
+      projectTitle={activeProject?.title}
+      required={createDialog.required}
+      onCancel={() => setCreateDialog(null)}
+      onCreate={createDialog.kind === "project" ? createProject : createThread}
+    />
+  ) : null;
 
   if (!thread) {
-    return <div className="boot">正在加载 EAI vNext...</div>;
+    return (
+      <>
+        <div className="boot">{bootstrapped ? "EAI-Desktop" : "正在加载 EAI vNext..."}</div>
+        {createDialogElement}
+      </>
+    );
   }
 
   return (
@@ -1540,8 +1552,8 @@ export function App() {
         activeProject={activeProject}
         atlases={atlases}
         onOpenThread={openThread}
-        onCreateThread={createThread}
-        onCreateProject={createProject}
+        onCreateThread={() => setCreateDialog({ kind: "thread", required: false })}
+        onCreateProject={() => setCreateDialog({ kind: "project", required: false })}
         onSwitchProject={switchProject}
         onDeleteProject={requestDeleteProject}
         onDeleteThread={requestDeleteThread}
@@ -1845,6 +1857,7 @@ export function App() {
           }}
         />
       )}
+      {createDialogElement}
       <DesktopSettings
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}

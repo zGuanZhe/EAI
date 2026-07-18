@@ -188,9 +188,73 @@ button.ui-activity-row:hover > aside { transform: translateX(3px); }
 .ui-activity-row p { margin: 3px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
 
 @keyframes ui-drawer-in { from { transform: translateX(16px); } }
+
+.workspace-create-layer {
+  position: fixed;
+  z-index: 140;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(25, 31, 39, .28);
+}
+
+.workspace-create-dialog {
+  width: min(520px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  border-radius: var(--radius-compact);
+  background: var(--panel);
+  box-shadow: 0 4px 8px rgba(22, 24, 26, .18);
+  animation: workspace-create-in var(--motion-fast) var(--ease-product);
+}
+
+.workspace-create-dialog > header {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.workspace-create-dialog > header > div { min-width: 0; }
+.workspace-create-dialog h2 { margin: 0; font-size: 17px; line-height: 1.35; letter-spacing: 0; }
+.workspace-create-dialog header p { margin: 3px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.workspace-create-icon { display: grid; width: 36px; height: 36px; place-items: center; border-radius: var(--radius-compact); background: var(--blue-soft); color: var(--blue); }
+
+.workspace-create-dialog form { display: grid; gap: 16px; padding: 20px; }
+.workspace-create-dialog form > label { display: grid; gap: 7px; }
+.workspace-create-dialog form > label > span { font-size: 13px; font-weight: 650; }
+.workspace-create-dialog input,
+.workspace-create-dialog textarea,
+.workspace-create-dialog select {
+  width: 100%;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-compact);
+  background: #fff;
+  color: var(--ink);
+}
+.workspace-create-dialog input,
+.workspace-create-dialog select { min-height: 42px; padding: 0 11px; }
+.workspace-create-dialog textarea { min-height: 104px; resize: vertical; padding: 10px 11px; line-height: 1.55; }
+.workspace-create-dialog input::placeholder,
+.workspace-create-dialog textarea::placeholder { color: var(--muted); opacity: 1; }
+.workspace-create-dialog input:disabled,
+.workspace-create-dialog textarea:disabled,
+.workspace-create-dialog select:disabled { cursor: default; opacity: .6; }
+
+.workspace-create-error { border-radius: var(--radius-compact); padding: 9px 11px; background: rgba(220, 38, 38, .07); color: #a51d27; font-size: 12px; line-height: 1.45; }
+.workspace-create-dialog form > footer { display: flex; justify-content: flex-end; gap: 8px; padding-top: 2px; }
+
+@keyframes workspace-create-in { from { transform: translateY(8px); opacity: 0; } }
 @media (max-width: 760px) {
   .ui-surface-header { align-items: flex-start; padding-inline: 16px; }
   .ui-surface-actions { max-width: 48%; }
   .ui-field-row { grid-template-columns: 1fr; gap: 8px; }
+  .workspace-create-layer { align-items: end; padding: 12px; }
+  .workspace-create-dialog { max-height: calc(100vh - 24px); }
+  .workspace-create-dialog > header,
+  .workspace-create-dialog form { padding: 16px; }
 }
-@media (prefers-reduced-motion: reduce) { .ui-drawer { animation: none; } .ui-button, .ui-activity-row, .ui-activity-row > aside { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .ui-drawer, .workspace-create-dialog { animation: none; } .ui-button, .ui-activity-row, .ui-activity-row > aside { transition: none; } }

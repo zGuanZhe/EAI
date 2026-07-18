@@ -111,6 +111,15 @@ with sync_playwright() as playwright:
     page.wait_for_timeout(260)
     assert abs(page.locator(".sidebar").bounding_box()["width"] - expanded_sidebar_width) <= 2
     page.screenshot(path=str(RESULTS / "home-desktop.png"))
+    page.locator(".sidebar-primary-action").click()
+    create_dialog = page.locator(".workspace-create-dialog")
+    create_dialog.wait_for(state="visible")
+    assert create_dialog.get_by_role("textbox").count() == 2
+    assert create_dialog.get_by_role("combobox").count() == 1
+    assert page.evaluate("document.activeElement === document.querySelector('.workspace-create-dialog input')")
+    page.screenshot(path=str(RESULTS / "create-thread-dialog.png"))
+    page.keyboard.press("Escape")
+    create_dialog.wait_for(state="detached")
     page.locator(".sidebar-footer button").last.click()
     page.locator(".settings-drawer").wait_for(state="visible")
     page.screenshot(path=str(RESULTS / "settings-desktop.png"))
@@ -378,6 +387,14 @@ with sync_playwright() as playwright:
     narrow_footer = narrow.locator(".home-composer-footer").bounding_box()
     assert abs((narrow_footer["y"] + narrow_footer["height"]) - 900) <= 2
     narrow.screenshot(path=str(RESULTS / "home-narrow.png"))
+    narrow.locator(".sidebar-primary-action").click()
+    narrow_create_dialog = narrow.locator(".workspace-create-dialog")
+    narrow_create_dialog.wait_for(state="visible")
+    assert narrow_create_dialog.bounding_box()["width"] <= 736
+    assert_no_horizontal_overflow(narrow)
+    narrow.screenshot(path=str(RESULTS / "create-thread-dialog-narrow.png"))
+    narrow.keyboard.press("Escape")
+    narrow_create_dialog.wait_for(state="detached")
     narrow.locator(".sidebar-footer button").last.click()
     narrow.locator(".settings-drawer").wait_for(state="visible")
     assert_no_horizontal_overflow(narrow)
