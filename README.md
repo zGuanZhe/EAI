@@ -6,7 +6,7 @@ EAI Desktop 是一个本地优先的个人科研工作台。它把日常问答�
 
 ## 下载
 
-从 [GitHub Releases](https://github.com/zGuanZhe/EAI/releases/latest) 下载 `EAI Desktop_1.0.0_x64-setup.exe`。
+从 [GitHub Releases](https://github.com/zGuanZhe/EAI/releases/latest) 下载 `EAI-Desktop_1.0.0_x64-setup.exe`。
 
 安装包当前未进行代码签名，Windows 可能显示 SmartScreen 提示。应用数据保存在 `%APPDATA%\com.eai.desktop`，模型密钥保存在 Windows Credential Manager。
 
@@ -105,7 +105,7 @@ npm run desktop:smoke
 Release 页面同时公布安装包 SHA-256。下载后可在 PowerShell 中运行：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 '.\EAI Desktop_1.0.0_x64-setup.exe'
+Get-FileHash -Algorithm SHA256 '.\EAI-Desktop_1.0.0_x64-setup.exe'
 ```
 
 输出必须与 Release Notes 完全一致。安装包未签名；只应从 `github.com/zGuanZhe/EAI` 的正式 Release 下载，不应忽略来自其他来源的 SmartScreen 或下载警告。

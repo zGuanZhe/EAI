@@ -15,7 +15,7 @@ EAI Desktop 1.0.0 是本地优先科研工作台的首个正式公开版本，�
 
 ## 安装
 
-从本 Release 下载 `EAI Desktop_1.0.0_x64-setup.exe`，在 Windows 10/11 x64 上运行。安装包当前未签名，Windows 可能显示 SmartScreen 提示。
+从本 Release 下载 `EAI-Desktop_1.0.0_x64-setup.exe`，在 Windows 10/11 x64 上运行。安装包当前未签名，Windows 可能显示 SmartScreen 提示。
 
 应用数据位于 `%APPDATA%\com.eai.desktop`，Provider Key 位于 Windows Credential Manager。变更主版本前请备份完整 AppData；不支持降级到实验性 0.x 包。
 
@@ -26,7 +26,7 @@ SHA-256：`7B88CDD85518872FFF9197190E59E91BFFF9953A13D239D9C8B0B6FFED80D61E`
 校验命令：
 
 ```powershell
-Get-FileHash -Algorithm SHA256 '.\EAI Desktop_1.0.0_x64-setup.exe'
+Get-FileHash -Algorithm SHA256 '.\EAI-Desktop_1.0.0_x64-setup.exe'
 ```
 
 ## 验证
