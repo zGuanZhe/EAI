@@ -82,6 +82,71 @@ class ResearchStoreTest(unittest.TestCase):
 
             self.assertEqual(database.read_bytes(), before)
 
+    def test_041_bridge_round_trip_preserves_schema4_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            research_dir = root / "research"
+            personal_dir = root / "personal"
+            store = ResearchStore(research_dir, ATLAS_DIR, personal_dir)
+            store.save_record(
+                "thread",
+                "thread-schema4",
+                {"id": "thread-schema4", "title": "Schema 4 thread", "revision": 7},
+                projection_target="threads/thread-schema4.json",
+            )
+            draft = store.put_thread_draft(
+                "thread-schema4",
+                expected_revision=0,
+                text="Unsent draft",
+                agent_mode="local_only",
+                attachment_refs=[{"type": "document", "id": "doc-1"}],
+            )
+            store.save_record(
+                "campaign",
+                "campaign-schema4",
+                {"id": "campaign-schema4", "thread_id": "thread-schema4", "stage": "ablation"},
+            )
+            self.assertEqual(store.projection_status()["pending"], 1)
+            store.close()
+
+            database = research_dir / "research.db"
+            before = database.read_bytes()
+            bridge = ResearchStore(
+                research_dir,
+                ATLAS_DIR,
+                personal_dir,
+                supported_schema_version=3,
+            )
+            self.assertEqual(bridge.compatibility_status(), {
+                "schema_version": 4,
+                "supported_schema_version": 3,
+                "read_only": True,
+                "reason": "schema_newer_than_app",
+            })
+            self.assertEqual(bridge.get_record("thread", "thread-schema4")["revision"], 7)
+            self.assertEqual(bridge.get_record("campaign", "campaign-schema4")["stage"], "ablation")
+            self.assertEqual(bridge.get_thread_draft("thread-schema4")["revision"], draft["revision"])
+            self.assertEqual(bridge.projection_status()["pending"], 1)
+            with self.assertRaises(SchemaReadOnlyError):
+                bridge.put_thread_draft(
+                    "thread-schema4",
+                    expected_revision=draft["revision"],
+                    text="Blocked overwrite",
+                    agent_mode="auto",
+                    attachment_refs=[],
+                )
+            with self.assertRaises(SchemaReadOnlyError):
+                bridge.save_record("campaign", "campaign-schema4", {"id": "campaign-schema4", "stage": "release"})
+            bridge.close()
+            self.assertEqual(database.read_bytes(), before)
+
+            reopened = ResearchStore(research_dir, ATLAS_DIR, personal_dir)
+            self.assertEqual(reopened.get_thread_draft("thread-schema4")["text"], "Unsent draft")
+            self.assertEqual(reopened.get_record("campaign", "campaign-schema4")["stage"], "ablation")
+            self.assertEqual(reopened.get_record("thread", "thread-schema4")["revision"], 7)
+            self.assertEqual(reopened.projection_status()["pending"], 1)
+            reopened.close()
+
     def test_app_services_rebuilds_store_when_data_root_changes(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -102,7 +102,14 @@ def managed_store_connections(cls):
 
 @managed_store_connections
 class ResearchStore:
-    def __init__(self, research_dir: Path, atlas_dir: Path, personal_dir: Path):
+    def __init__(
+        self,
+        research_dir: Path,
+        atlas_dir: Path,
+        personal_dir: Path,
+        *,
+        supported_schema_version: int = SCHEMA_VERSION,
+    ):
         self.research_dir = research_dir.resolve()
         self.atlas_dir = atlas_dir.resolve()
         self.personal_dir = personal_dir.resolve()
@@ -117,6 +124,7 @@ class ResearchStore:
         self._lock = threading.RLock()
         self._connection: sqlite3.Connection | None = None
         self._active_calls = 0
+        self.supported_schema_version = supported_schema_version
         self.schema_version = 0
         self.read_only = False
         self._open_connection()
@@ -124,12 +132,14 @@ class ResearchStore:
         try:
             previous_version = self._current_schema_version()
             self.schema_version = previous_version
-            if previous_version > SCHEMA_VERSION:
+            if previous_version > self.supported_schema_version:
                 self.read_only = True
                 self.close()
                 self._open_connection()
                 self.close()
                 return
+            if self.supported_schema_version != SCHEMA_VERSION:
+                raise ValueError("schema compatibility override is only valid for a newer existing database")
             if previous_version and previous_version < SCHEMA_VERSION:
                 startup_backup = self._backup_database_handle(f"schema-v{previous_version}-to-v{SCHEMA_VERSION}")
             self._initialize()
@@ -197,7 +207,7 @@ class ResearchStore:
     def compatibility_status(self) -> dict[str, Any]:
         status = {
             "schema_version": self.schema_version,
-            "supported_schema_version": SCHEMA_VERSION,
+            "supported_schema_version": self.supported_schema_version,
             "read_only": self.read_only,
             "reason": "schema_newer_than_app" if self.read_only else "",
         }
@@ -209,7 +219,7 @@ class ResearchStore:
         if self.read_only:
             raise SchemaReadOnlyError(
                 database_schema=self.schema_version,
-                supported_schema=SCHEMA_VERSION,
+                supported_schema=self.supported_schema_version,
             )
 
     def _enter_call(self) -> None:
@@ -1828,7 +1838,7 @@ class ResearchStore:
         with self._lock:
             embedding_count = int(self._connection.execute("SELECT COUNT(*) FROM embeddings WHERE model_id=?", (PROFILE_ID,)).fetchone()[0])
         return KnowledgeStatus(
-            ready=counts["works"] > 0, schema_version=SCHEMA_VERSION, database_path=str(self.db_path), counts=counts,
+            ready=counts["works"] > 0, schema_version=self.schema_version, database_path=str(self.db_path), counts=counts,
             coverage={"metadata": round(metadata / total, 4), "full_text": round(full_text / total, 4),
                       "verified_relations": round(verified_relations / relation_total, 4),
                       "claim_evidence": round(counts["evidence"] / max(1, counts["claims"]), 4)},

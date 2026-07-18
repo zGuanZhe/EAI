@@ -17,7 +17,7 @@ Run Campaign Docker smoke when Campaign/Docker changes, sidecar gates when its d
 - Repository bootstrap: passed with clean npm dependencies and repository-local Python environment.
 - Frontend Vitest: 23 tests passed, including axe and Atlas query race coverage.
 - Frontend production build: passed.
-- Service unittest: 79 tests passed, including Agent v2.1, SourcePolicy, Evidence Guard, SSE replay, Research Store schema 4/outbox, PDF limits, Campaign, legacy read/410 boundaries, drafts, OperationBatch and ChangeSet undo.
+- Service unittest: 80 tests passed, including Agent v2.1, SourcePolicy, Evidence Guard, SSE replay, Research Store schema 4/outbox, the 0.4.1 schema-3-ceiling round trip, PDF limits, Campaign, legacy read/410 boundaries, drafts, OperationBatch and ChangeSet undo.
 - Playwright: passed with the isolated empty seed at `1440x900`, `1180x820`, and `760x900`; narrow main width was 696px.
 - Campaign Docker fixture: last attempt failed while Docker Hub returned an anonymous-token EOF pulling `python:3.11-slim`; no host fallback ran. A green rerun is required before release.
 - Sidecar: rebuilt from the new workspace with Python 3.14.4; random-port authentication and Tauri CORS smoke passed.
@@ -31,7 +31,7 @@ The smoke script silently installs NSIS to a temporary directory, launches with 
 ## 0.5 Release Requirements
 
 - Record schema 3 -> 4 online backup, migration report and projection backlog report.
-- Verify 0.4.1 opens schema 4 read-only, every write has zero side effects, and reopening with 0.5 preserves drafts, projection journal, Campaign and revisions.
+- The synthetic 0.4.1 schema-3-ceiling round trip is green: schema 4 opened read-only, writes had zero side effects, and 0.5 reopening preserved drafts, projection journal, Campaign and revisions. Repeat this with the packaged 0.4.1 executable before release.
 - Run sidecar build/test, Rust fmt/Clippy/test, PyInstaller, Rust release and NSIS install/upgrade/downgrade/uninstall with isolated AppData.
 - Run 20 restricted real Provider queries: zero forged citations, every locator opens, and source-policy correctness is at least 95%.
 - Scan runtime code/scripts for absolute workspace paths and secret-like values; remove temporary development switches.
