@@ -18,6 +18,7 @@ ROUTE_ALLOWLIST = {
     "routers/system.py",
     "routers/drafts.py",
     "routers/workspace.py",
+    "routers/atlas.py",
 }
 DIRECT_REPOSITORY_ROUTER_ALLOWLIST = {"research/router.py"}
 
@@ -118,6 +119,8 @@ if "@app.on_event" in application_source:
     FAILURES.append("application.py: startup and shutdown must use FastAPI lifespan")
 if "create_app(lifespan=app_lifespan)" not in application_source:
     FAILURES.append("application.py: AppServices must be owned by the ASGI lifespan")
+if "create_atlas_router(get_atlas_service)" not in application_source:
+    FAILURES.append("application.py: Atlas router must be registered through its service boundary")
 
 if FAILURES:
     print("\n".join(FAILURES), file=sys.stderr)

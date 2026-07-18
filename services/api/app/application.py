@@ -59,11 +59,13 @@ from .core.storage import atomic_write_json_file, backup_file, read_json_file
 from .factory import create_app
 from .routers.system import create_system_router
 from .routers.drafts import create_draft_router
+from .routers.atlas import create_atlas_router
 from .routers.workspace import create_workspace_router
 from .repositories.personal import safe_document_path, safe_object_memory_path
 from .services.projection import ProjectionService
 from .services.drafts import ThreadDraftService
 from .services.container import AppServices
+from .services.atlas import AtlasService
 from .services.workspace import WorkspaceService
 from .research.context import build_research_state, evidence_bundle_to_sources, search_for_agent
 from .research.documents import import_document as import_research_document
@@ -141,6 +143,16 @@ def get_workspace_service() -> WorkspaceService:
         projects_dir=PROJECTS_DIR,
         threads_dir=THREADS_DIR,
         backups_dir=BACKUPS_DIR,
+    )
+
+
+def get_atlas_service() -> AtlasService:
+    return AtlasService(
+        get_research_store(),
+        atlas_cache_dir=WEB_DATA_DIR,
+        personal_dir=PERSONAL_DIR,
+        objects_dir=OBJECTS_DIR,
+        atlas_updates_dir=ATLAS_UPDATES_DIR,
     )
 
 
@@ -304,6 +316,7 @@ app.include_router(
 )
 app.include_router(create_draft_router(lambda: ThreadDraftService(get_research_store())))
 app.include_router(create_workspace_router(get_workspace_service))
+app.include_router(create_atlas_router(get_atlas_service))
 
 
 def load_thread(thread_id: str) -> ThreadDoc:
@@ -333,45 +346,15 @@ def write_project(doc: ProjectDoc) -> ProjectDoc:
 
 
 def load_object_memory(atlas_id: str, object_type: str, object_id: str) -> ObjectMemory | None:
-    record_id = f"{atlas_id}:{object_type}:{object_id}"
-    data = get_research_store().get_record("object_memory", record_id)
-    if data is not None:
-        return ObjectMemory.model_validate(data)
-    path = safe_object_path(atlas_id, object_type, object_id)
-    if not path.exists():
-        return None
-    data = read_json(path)
-    get_research_store().save_record("object_memory", record_id, data)
-    return ObjectMemory.model_validate(data)
+    return get_atlas_service().load_object_memory(atlas_id, object_type, object_id)
 
 
 def effective_object_memory(atlas_id: str, object_type: str, object_id: str) -> ObjectMemory | None:
-    saved = load_object_memory(atlas_id, object_type, object_id)
-    if saved:
-        return saved
-    if object_type != "paper":
-        return None
-    for item in bundle_memory_items(atlas_id):
-        ref = item.object_ref
-        if ref.get("object_type") == object_type and ref.get("object_id") == object_id:
-            return item
-    return None
+    return get_atlas_service().effective_object_memory(atlas_id, object_type, object_id)
 
 
 def write_object_memory(atlas_id: str, object_type: str, object_id: str, memory: ObjectMemory) -> ObjectMemory:
-    get_research_store().ensure_writable()
-    path = safe_object_path(atlas_id, object_type, object_id)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    memory.object_ref = {
-        **memory.object_ref,
-        "atlas_id": atlas_id,
-        "object_type": object_type,
-        "object_id": object_id,
-    }
-    memory.tags = [tag.strip() for tag in memory.tags if tag.strip()]
-    memory.updated_at = utc_now()
-    save_projected_record("object_memory", f"{atlas_id}:{object_type}:{object_id}", memory.model_dump(mode="json"), path)
-    return memory
+    return get_atlas_service().write_object_memory(atlas_id, object_type, object_id, memory)
 
 
 def normalize_title(value: str | None) -> str:
@@ -381,23 +364,11 @@ def normalize_title(value: str | None) -> str:
 
 
 def load_atlas_updates(atlas_id: str) -> AtlasUpdateDoc:
-    stored = get_research_store().get_record("atlas_update", atlas_id)
-    if stored is not None:
-        return AtlasUpdateDoc.model_validate(stored)
-    path = safe_atlas_update_path(atlas_id)
-    if not path.exists():
-        return AtlasUpdateDoc(atlas_id=atlas_id, updated_at=utc_now())
-    data = read_json(path)
-    get_research_store().save_record("atlas_update", atlas_id, data)
-    return AtlasUpdateDoc.model_validate(data)
+    return get_atlas_service().load_updates(atlas_id)
 
 
 def write_atlas_updates(doc: AtlasUpdateDoc) -> AtlasUpdateDoc:
-    get_research_store().ensure_writable()
-    path = safe_atlas_update_path(doc.atlas_id)
-    doc.updated_at = utc_now()
-    save_projected_record("atlas_update", doc.atlas_id, doc.model_dump(mode="json"), path)
-    return doc
+    return get_atlas_service().write_updates(doc)
 
 
 def load_lab_run(run_id: str) -> LabRun:
@@ -445,10 +416,10 @@ def append_lab_message(run: LabRun, message: LabMessage) -> LabMessage:
 
 
 def atlas_bundle_for_update(atlas_id: str) -> dict[str, Any]:
-    path = WEB_DATA_DIR / f"{atlas_id}.bundle.json"
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="atlas bundle not found")
-    return read_json(path)
+    try:
+        return get_atlas_service().bundle_for_update(atlas_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc.args[0])) from exc
 
 
 def bundle_dedupe_index(bundle: dict[str, Any], updates: AtlasUpdateDoc | None = None) -> dict[str, str]:
@@ -703,174 +674,40 @@ def build_atlas_update_task_pack(atlas_id: str, payload: AtlasUpdateTaskPackRequ
     return AtlasUpdateTaskPackResponse(run=run, markdown=markdown, token_estimate=run.token_estimate)
 
 
-@app.get("/api/vnext/atlases")
 def list_atlases() -> list[dict[str, Any]]:
-    index_path = WEB_DATA_DIR / "atlases.index.json"
-    fallback_path = WEB_DATA_DIR / "atlases.json"
-    if index_path.exists():
-        data = read_json(index_path)
-    elif fallback_path.exists():
-        data = read_json(fallback_path)
-    else:
-        raise HTTPException(status_code=404, detail="atlas index not found")
-    atlases = data.get("atlases", data) if isinstance(data, dict) else data
-    return [
-        {
-            "id": a.get("id"),
-            "title": a.get("title") or a.get("name") or a.get("id"),
-            "title_cn": a.get("title_cn") or a.get("cn"),
-            "paper_count": a.get("paper_count") or a.get("papers") or 0,
-        }
-        for a in atlases
-        if a.get("id")
-    ]
+    return get_atlas_service().list_atlases()
 
 
-@app.get("/api/vnext/atlases/{atlas_id}/bundle")
 def get_atlas_bundle(atlas_id: str) -> dict[str, Any]:
-    path = WEB_DATA_DIR / f"{atlas_id}.bundle.json"
-    data = read_json(path)
-    evidence_index = get_research_store().atlas_evidence_index(atlas_id)
-    for paper in data.get("papers") or []:
-        paper["evidence_status"] = evidence_index["works"].get(str(paper.get("id")), {})
-    for relation in data.get("relations") or []:
-        relation.update(evidence_index["relations"].get(str(relation.get("id")), {}))
-    return data
+    return get_atlas_service().get_bundle(atlas_id)
 
 
 def bundle_memory_items(atlas_id: str) -> list[ObjectMemory]:
-    bundle_path = WEB_DATA_DIR / f"{atlas_id}.bundle.json"
-    if not bundle_path.exists():
-        return []
-    data = read_json(bundle_path)
-    items: list[ObjectMemory] = []
-    for paper in data.get("papers", []):
-        notes = paper.get("personal_notes") or []
-        note_text = "\n".join(
-            note.get("content", "")
-            for note in notes
-            if isinstance(note, dict) and note.get("content")
-        )
-        if not (paper.get("personal_star") or paper.get("personal_maturity") or note_text):
-            continue
-        items.append(
-            ObjectMemory(
-                object_ref={
-                    "atlas_id": atlas_id,
-                    "object_type": "paper",
-                    "object_id": paper.get("id"),
-                    "source": "bundle",
-                },
-                title_snapshot=paper.get("title") or paper.get("id") or "",
-                star=bool(paper.get("personal_star")),
-                maturity=int(paper.get("personal_maturity") or 0),
-                note=note_text,
-                updated_at=paper.get("personal_last_read_at"),
-            )
-        )
-    return items
+    return get_atlas_service().bundle_memory_items(atlas_id)
 
 
-@app.get("/api/vnext/object-memory")
 def list_object_memory(atlas_id: str) -> list[ObjectMemory]:
-    ensure_dirs()
-    by_key: dict[tuple[str, str], ObjectMemory] = {}
-    for item in bundle_memory_items(atlas_id):
-        ref = item.object_ref
-        by_key[(ref.get("object_type"), ref.get("object_id"))] = item
-
-    for raw in get_research_store().list_records("object_memory"):
-        try:
-            item = ObjectMemory.model_validate(raw)
-        except Exception:
-            continue
-        ref = item.object_ref
-        if ref.get("atlas_id") != atlas_id:
-            continue
-        by_key[(ref.get("object_type"), ref.get("object_id"))] = item
-    return sorted(
-        by_key.values(),
-        key=lambda item: item.updated_at or "",
-        reverse=True,
-    )
+    return get_atlas_service().list_object_memory(atlas_id)
 
 
-@app.put("/api/vnext/object-memory/{atlas_id}/{object_type}/{object_id}", response_model=ObjectMemory)
 def update_object_memory(atlas_id: str, object_type: CardType, object_id: str, payload: ObjectMemory) -> ObjectMemory:
-    return write_object_memory(atlas_id, object_type, object_id, payload)
+    return get_atlas_service().write_object_memory(atlas_id, object_type, object_id, payload)
 
 
-@app.get("/api/vnext/atlas-updates/{atlas_id}", response_model=AtlasUpdateDoc)
 def get_atlas_updates(atlas_id: str) -> AtlasUpdateDoc:
-    return load_atlas_updates(atlas_id)
+    return get_atlas_service().load_updates(atlas_id)
 
 
-@app.post("/api/vnext/atlas-updates/{atlas_id}/task-pack/preview", response_model=AtlasUpdateTaskPackResponse)
 def preview_atlas_update_task_pack(atlas_id: str, payload: AtlasUpdateTaskPackRequest) -> AtlasUpdateTaskPackResponse:
-    return build_atlas_update_task_pack(atlas_id, payload)
+    return get_atlas_service().build_update_task_pack(atlas_id, payload)
 
 
-@app.post("/api/vnext/atlas-updates/{atlas_id}/results/preview", response_model=AtlasUpdateResultPreviewResponse)
 def preview_atlas_update_result(atlas_id: str, payload: AtlasUpdateResultPreviewRequest) -> AtlasUpdateResultPreviewResponse:
-    raw = payload.raw_text.strip()
-    if not raw:
-        raise HTTPException(status_code=400, detail="empty update result text")
-    bundle = atlas_bundle_for_update(atlas_id)
-    updates = load_atlas_updates(atlas_id)
-    route_ids = {str(route.get("id")) for route in bundle.get("routes", []) or [] if route.get("id")}
-    run = AtlasUpdateRun(
-        id=slug_id("update_run"),
-        action=payload.action,
-        title=atlas_update_action_title(payload.action),
-        status="parsed",
-        created_at=utc_now(),
-        summary=f"粘贴返回：{atlas_update_action_title(payload.action)}",
-    )
-    candidates = extract_update_candidates(raw, atlas_id, run.id or "", route_ids)
-    index = bundle_dedupe_index(bundle, updates)
-    existing_ids = {candidate.id for candidate in updates.candidates}
-    duplicate_count = 0
-    appended: list[AtlasUpdateCandidate] = []
-    for candidate in candidates:
-        if candidate.id in existing_ids:
-            candidate.id = slug_id("cand")
-        duplicate = candidate_duplicate_of(candidate, index)
-        if duplicate:
-            candidate.duplicate_of = duplicate
-            duplicate_count += 1
-        appended.append(candidate)
-        for key in (
-            f"title:{normalize_title(candidate.title)}",
-            f"doi:{candidate.doi.lower()}",
-            f"arxiv:{candidate.arxiv_id.lower()}",
-        ):
-            if not key.endswith(":"):
-                index.setdefault(key, candidate.id or "")
-    run.candidate_count = len(appended)
-    updates.runs.insert(0, run)
-    updates.candidates = appended + updates.candidates
-    write_atlas_updates(updates)
-    return AtlasUpdateResultPreviewResponse(run=run, candidates=appended, duplicate_count=duplicate_count)
+    return get_atlas_service().preview_update_result(atlas_id, payload)
 
 
-@app.put("/api/vnext/atlas-updates/{atlas_id}/candidates/{candidate_id}", response_model=AtlasUpdateDoc)
 def update_atlas_candidate(atlas_id: str, candidate_id: str, payload: AtlasCandidateUpdate) -> AtlasUpdateDoc:
-    safe_object_path(atlas_id, "paper", candidate_id)
-    updates = load_atlas_updates(atlas_id)
-    for candidate in updates.candidates:
-        if candidate.id == candidate_id:
-            raw = candidate.model_dump(mode="json")
-            changes = payload.model_dump(exclude_unset=True, mode="json")
-            raw.update({key: value for key, value in changes.items() if value is not None})
-            raw["id"] = candidate_id
-            raw["updated_at"] = utc_now()
-            candidate_new = AtlasUpdateCandidate.model_validate(raw)
-            updates.candidates = [
-                candidate_new if item.id == candidate_id else item
-                for item in updates.candidates
-            ]
-            return write_atlas_updates(updates)
-    raise HTTPException(status_code=404, detail="candidate not found")
+    return get_atlas_service().update_candidate(atlas_id, candidate_id, payload)
 
 
 def apply_candidate_to_personal_memory(atlas_id: str, candidate: AtlasUpdateCandidate) -> None:
@@ -896,41 +733,12 @@ def apply_candidate_to_personal_memory(atlas_id: str, candidate: AtlasUpdateCand
     write_object_memory(atlas_id, "paper", object_id, memory)
 
 
-@app.post("/api/vnext/atlas-updates/{atlas_id}/candidates/{candidate_id}/apply", response_model=AtlasUpdateDoc)
 def apply_atlas_candidate(atlas_id: str, candidate_id: str) -> AtlasUpdateDoc:
-    safe_object_path(atlas_id, "paper", candidate_id)
-    updates = load_atlas_updates(atlas_id)
-    for candidate in updates.candidates:
-        if candidate.id == candidate_id:
-            candidate.status = "applied"
-            candidate.updated_at = utc_now()
-            apply_candidate_to_personal_memory(atlas_id, candidate)
-            return write_atlas_updates(updates)
-    raise HTTPException(status_code=404, detail="candidate not found")
+    return get_atlas_service().apply_candidate(atlas_id, candidate_id)
 
 
-@app.post("/api/vnext/atlas-updates/{atlas_id}/candidates/bulk-apply", response_model=AtlasUpdateResultPreviewResponse)
 def bulk_apply_atlas_candidates(atlas_id: str) -> AtlasUpdateResultPreviewResponse:
-    updates = load_atlas_updates(atlas_id)
-    applied = 0
-    for candidate in updates.candidates:
-        if candidate.status == "pending" and not candidate.duplicate_of and candidate.confidence >= 0.65:
-            candidate.status = "applied"
-            candidate.updated_at = utc_now()
-            apply_candidate_to_personal_memory(atlas_id, candidate)
-            applied += 1
-    run = AtlasUpdateRun(
-        id=slug_id("update_run"),
-        action="recent",
-        title="批量应用候选",
-        status="done",
-        created_at=utc_now(),
-        candidate_count=applied,
-        summary=f"批量应用 {applied} 篇候选论文",
-    )
-    updates.runs.insert(0, run)
-    write_atlas_updates(updates)
-    return AtlasUpdateResultPreviewResponse(run=run, candidates=updates.candidates, applied_count=applied)
+    return get_atlas_service().bulk_apply_candidates(atlas_id)
 
 
 @app.post("/api/vnext/object-memory/{atlas_id}/paper/{paper_id}/chat", response_model=ObjectMemory)
