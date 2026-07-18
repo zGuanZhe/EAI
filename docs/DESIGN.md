@@ -62,7 +62,7 @@ Codex-like research workspace:
 - Atlas paper nodes use soft route-tinted surfaces without full borders. Edges use deterministic ports and orthogonal year/route gutters.
 - Paper click opens preview, double-click or Enter opens reading, and Context remains directly toggleable on the node.
 - Context add buttons toggle between plus and green check.
-- Durable writes are atomic ChangeSets with field selection, conflict detection, receipts, and safe undo.
+- Durable writes use SQLite-transactional ChangeSets with field selection, conflict detection, receipts, and safe undo. JSON compatibility projections are replayable and eventually consistent outside that transaction.
 
 ## Component Vocabulary
 

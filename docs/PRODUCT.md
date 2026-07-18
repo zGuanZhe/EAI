@@ -27,7 +27,7 @@ Every visible primary action must serve one of those steps. Capabilities outside
 - Context Canvas: one workspace with an argument view for questions, hypotheses, evidence, decisions and tasks, plus a Campaign view for progressive experiment branches.
 - Research Campaign: an AI Scientist v2-derived workflow covering evidence preparation, progressive BFTS experiments, writeup, three-role review, revision, and release validation.
 - Object Memory: durable personal judgement attached to papers, relations, paths, files, candidates, and reading notes.
-- OperationBatch: the Runtime v2 atomic operation proposal. It records real before/after values, requires risk-based confirmation, and supports conflict-safe undo.
+- OperationBatch: the Runtime v2 SQLite-transactional operation proposal. It records real before/after values, requires risk-based confirmation, and supports conflict-safe undo. JSON compatibility projections are eventually consistent and are not part of that transaction.
 - ChangeSet: the compatible v1 proposal format retained for historical threads.
 - Task Pack: an advanced interoperability package available from the context editor, not a primary workflow step.
 - Legacy Lab Run: a migration-only source. Existing records become archived manual Campaign branches; no new Lab Run is created.
@@ -57,6 +57,8 @@ Every visible primary action must serve one of those steps. Capabilities outside
 - Atlas nodes show only compact evidence readiness; synchronization detail remains in Run Center and never interrupts ordinary chat.
 - AI output never writes directly to long-term memory. MemoryDraft and OperationBatch require confirmation; successful batches expose safe undo.
 - Research prose appears only after Evidence Guard validation. Retrieved-but-unused sources remain in audit and never appear as answer citations.
+- Evidence labels describe citation integrity and sufficiency, not factual truth: “引用定位已核验”, “证据有限”, or “未通过核验”.
+- Thread drafts survive refresh and carry revision/updated_at. Multi-window conflicts never use silent last-write-wins, and attachments persist only as registered `{type, id}` references.
 - The interface feels quiet, trustworthy, and repeatable under daily use.
 
 ## Non-goals
