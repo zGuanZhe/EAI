@@ -40,6 +40,9 @@ Codex-like research workspace:
 
 ## Interaction Rules
 
+- A fresh empty workspace starts with the full Composer and example research questions. Creating a project or research question remains an explicit organizing action, not a startup gate.
+- The versioned four-step onboarding coach is non-modal, skippable, replayable from the sidebar, and never blocks the Composer. It repositions on scroll, resize, and zoom; compact layouts use an edge-aligned explanation instead of covering the target.
+- Product option menus use the shared portal Listbox rather than browser-native select popups. Keyboard navigation, prefix search, focus restoration, disabled states, and viewport-aware placement are part of the component contract.
 - Enter sends; Shift+Enter inserts a newline; Esc stops the active Main Agent run.
 - An active ResearchTask never repurposes the Composer. The non-modal task bar owns targeted steer, pause, resume and cancel controls; the Composer continues to create ordinary AskTurns. A running AskTurn retains separate Stop and Send controls.
 - `/atlas`, `/context`, and `/tools` are the only primary commands.

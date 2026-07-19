@@ -1,4 +1,12 @@
 import { ArrowRight, ArrowUpRight, Paperclip, Pin, Plus, Trash2, X } from "lucide-react";
+import { Select } from "../../components/ui/index.jsx";
+
+const PRIORITY_OPTIONS = [
+  { value: "0", label: "低" },
+  { value: "1", label: "普通" },
+  { value: "2", label: "高" },
+  { value: "3", label: "关键" }
+];
 
 function contextForAgent(card) {
   return card.include_in_agent !== false;
@@ -72,9 +80,7 @@ export function ContextMaterials({
                   <button type="button" className={card.pinned ? "active" : ""} onClick={() => onTogglePinned?.(card)}>{card.pinned ? "已置顶" : "置顶"}</button>
                   <label>
                     <span>优先级</span>
-                    <select value={card.priority ?? 1} onChange={(event) => onSetPriority?.(card, event.target.value)}>
-                      <option value="0">低</option><option value="1">普通</option><option value="2">高</option><option value="3">关键</option>
-                    </select>
+                    <Select value={card.priority ?? 1} options={PRIORITY_OPTIONS} onChange={(value) => onSetPriority?.(card, value)} ariaLabel={`${card.title}优先级`} compact />
                   </label>
                 </div>
                 <input defaultValue={card.agent_note || ""} onBlur={(event) => event.target.value !== (card.agent_note || "") && onSetNote?.(card, event.target.value)} placeholder="给 Main Agent 的备注" />

@@ -10,6 +10,7 @@ from typing import Any
 
 from ..agent_v2.provider import request_text_stream, request_tool_decision
 from ..core.secrets import read_secret_data
+from .anthropic_provider import AnthropicProvider
 
 
 class ProviderError(RuntimeError):
@@ -49,28 +50,62 @@ class ProviderAdapter:
 
     @staticmethod
     def _config(data: dict[str, Any] | None, requested_model: str | None = None) -> dict[str, str] | None:
+        selected_provider = os.environ.get("EAI_MODEL_PROVIDER", "").strip().lower()
+        env_anthropic = os.environ.get("ANTHROPIC_API_KEY")
+        if selected_provider == "anthropic" and env_anthropic:
+            return {
+                "api_key": env_anthropic,
+                "model": requested_model or os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-7"),
+                "base_url": os.environ.get("ANTHROPIC_BASE_URL", "https://api.anthropic.com"),
+                "api_format": "anthropic", "provider": "anthropic",
+            }
         env_openrouter = os.environ.get("OPENROUTER_API_KEY")
-        if env_openrouter:
+        if env_openrouter and selected_provider == "openrouter":
             return {
                 "api_key": env_openrouter,
                 "model": requested_model or os.environ.get("OPENROUTER_MODEL", "openrouter/auto"),
                 "base_url": os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
                 "api_format": "chat", "provider": "openrouter",
             }
+        env_key = os.environ.get("OPENAI_API_KEY")
+        if selected_provider and selected_provider not in {"anthropic", "openrouter"} and env_key:
+            return {
+                "api_key": env_key,
+                "model": requested_model or os.environ.get("OPENAI_MODEL", "gpt-4.1-mini"),
+                "base_url": os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+                "api_format": os.environ.get("OPENAI_API_FORMAT", "responses"),
+                "provider": selected_provider,
+            }
+        if env_openrouter and not selected_provider:
+            return {
+                "api_key": env_openrouter,
+                "model": requested_model or os.environ.get("OPENROUTER_MODEL", "openrouter/auto"),
+                "base_url": os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+                "api_format": "chat", "provider": "openrouter",
+            }
+        if selected_provider and not data:
+            return None
         if not data:
-            env_key = os.environ.get("OPENAI_API_KEY")
             if not env_key:
                 return None
             return {
                 "api_key": env_key,
                 "model": requested_model or os.environ.get("OPENAI_MODEL", "gpt-4.1-mini"),
                 "base_url": os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1"),
-                "api_format": os.environ.get("OPENAI_API_FORMAT", "responses"), "provider": "openai",
+                "api_format": os.environ.get("OPENAI_API_FORMAT", "responses"),
+                "provider": selected_provider or "openai",
             }
-        for provider, default_model, default_url, default_format in (
-            ("openrouter", "openrouter/auto", "https://openrouter.ai/api/v1", "chat"),
-            ("openai", "gpt-4.1-mini", "https://api.openai.com/v1", "responses"),
-        ):
+        provider_defaults = {
+            "anthropic": ("claude-opus-4-7", "https://api.anthropic.com", "anthropic"),
+            "openrouter": ("openrouter/auto", "https://openrouter.ai/api/v1", "chat"),
+            "openai": ("gpt-4.1-mini", "https://api.openai.com/v1", "responses"),
+        }
+        providers = [selected_provider] if selected_provider else ["anthropic", "openrouter", "openai"]
+        for provider in providers:
+            default_model, default_url, default_format = provider_defaults.get(
+                provider,
+                ("gpt-4.1-mini", "https://api.openai.com/v1", "chat"),
+            )
             upper = provider.upper()
             raw = data.get(provider) or data.get(provider.title()) or data.get(f"{upper}_API_KEY")
             if isinstance(raw, str):
@@ -94,6 +129,11 @@ class ProviderAdapter:
                     }
         return None
 
+    def configured_provider(self) -> str | None:
+        data, _ = read_secret_data(self.secret_candidates)
+        config = self._config(data)
+        return str(config["provider"]) if config else None
+
     def call_text(self, user_content: str, system_content: str, model: str | None = None) -> tuple[str, str]:
         env_mock = os.environ.get("EAI_VNEXT_MOCK_OPENAI_RESPONSE")
         if env_mock:
@@ -104,6 +144,11 @@ class ProviderAdapter:
             raise ProviderError(400, "未配置 OpenAI-compatible 密钥，无法发送 API。")
         if config.get("mock_response"):
             return config["mock_response"], config["model"]
+        if config.get("api_format") == "anthropic":
+            try:
+                return AnthropicProvider(config).call_text(user_content, system_content), config["model"]
+            except Exception as exc:
+                raise ProviderError(502, str(exc)) from exc
         base_url = config.get("base_url") or "https://api.openai.com/v1"
         if config.get("api_format") == "chat":
             endpoint = f"{base_url.rstrip('/')}/chat/completions"
@@ -190,10 +235,11 @@ class ProviderAdapter:
             raise ProviderError(400, "未配置模型通道")
         if config.get("mock_response"):
             return self._mock_chunks(str(config["mock_response"])), config.get("provider") or "openai", config["model"]
-        iterator = request_text_stream(
-            config, prompt,
-            "你是 EAI Desktop 自适应研究总管。只输出用户可读的自然语言，不输出内部协议。",
-            cancelled=cancelled,
+        system_prompt = "你是 EAI Desktop 自适应研究总管。只输出用户可读的自然语言，不输出内部协议。"
+        iterator = (
+            AnthropicProvider(config).stream_text(prompt, system_prompt, cancelled)
+            if config.get("api_format") == "anthropic"
+            else request_text_stream(config, prompt, system_prompt, cancelled=cancelled)
         )
         return iterator, config.get("provider") or "openai", config["model"]
 
@@ -223,6 +269,8 @@ class ProviderAdapter:
             return None
         if config.get("mock_response"):
             return str(config["mock_response"])
+        if config.get("api_format") == "anthropic":
+            return AnthropicProvider(config).tool_decision(prompt, tools)
         return request_tool_decision(config, prompt, tools)
 
     def campaign_plan_model(self, prompt: str) -> str | None:

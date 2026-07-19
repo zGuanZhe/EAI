@@ -52,4 +52,4 @@ Web and service gates must pass before `desktop:build`. A Docker-unavailable Cam
 - Run `git diff --check` and the relevant gates before committing.
 - Search runtime code and scripts for absolute workspace paths and secret-like values.
 - Preserve `com.eai.desktop` and user-data compatibility unless an explicit migration is approved.
-- Current product version is `1.0.0`.
+- Current product version is `1.0.1`.

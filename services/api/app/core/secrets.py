@@ -28,6 +28,10 @@ def read_secret_data(candidates: list[Path | None]) -> tuple[dict[str, Any] | No
 def safe_secret_status(data: dict[str, Any] | None, path: Path | None, env_key: bool) -> dict[str, Any]:
     providers: list[dict[str, Any]] = []
     if data:
+        raw_anthropic = data.get("anthropic") or data.get("Anthropic") or data.get("ANTHROPIC_API_KEY")
+        if raw_anthropic:
+            model = raw_anthropic.get("model") if isinstance(raw_anthropic, dict) else data.get("anthropic_model")
+            providers.append({"provider": "anthropic", "configured": True, "model": model or "默认模型"})
         raw_router = data.get("openrouter") or data.get("OpenRouter") or data.get("OPENROUTER_API_KEY")
         if raw_router:
             model = raw_router.get("model") if isinstance(raw_router, dict) else data.get("openrouter_model")
@@ -36,12 +40,15 @@ def safe_secret_status(data: dict[str, Any] | None, path: Path | None, env_key: 
         if raw:
             model = raw.get("model") if isinstance(raw, dict) else data.get("openai_model")
             providers.append({"provider": "openai", "configured": True, "model": model or "默认模型"})
+    selected_provider = os.environ.get("EAI_MODEL_PROVIDER", "").strip().lower()
+    if os.environ.get("ANTHROPIC_API_KEY") and not any(item["provider"] == "anthropic" for item in providers):
+        providers.append({"provider": "anthropic", "configured": True, "model": os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-7")})
     if os.environ.get("OPENROUTER_API_KEY") and not any(item["provider"] == "openrouter" for item in providers):
         providers.append({"provider": "openrouter", "configured": True, "model": os.environ.get("OPENROUTER_MODEL", "openrouter/auto")})
-    if env_key and not providers:
-        providers.append({"provider": "openai", "configured": True, "model": os.environ.get("OPENAI_MODEL", "默认模型")})
+    if env_key and not any(item["provider"] == (selected_provider or "openai") for item in providers):
+        providers.append({"provider": selected_provider or "openai", "configured": True, "model": os.environ.get("OPENAI_MODEL", "默认模型")})
     return {
         "configured": bool(providers),
         "providers": providers,
-        "source": "environment" if (env_key or os.environ.get("OPENROUTER_API_KEY")) else ("user_config" if path else "none"),
+        "source": "environment" if (env_key or os.environ.get("OPENROUTER_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")) else ("user_config" if path else "none"),
     }

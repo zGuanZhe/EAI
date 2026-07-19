@@ -38,6 +38,10 @@
   --motion-layout: 220ms;
   --motion-drawer: 240ms;
   --ease-product: cubic-bezier(.22, 1, .36, 1);
+  --font-body: 14px;
+  --font-control: 13px;
+  --font-meta: 12px;
+  --font-caption: 11px;
   --left-width: 248px;
   --right-width: 400px;
   font-family: "Segoe UI Variable", "Microsoft YaHei UI", "Segoe UI", sans-serif;

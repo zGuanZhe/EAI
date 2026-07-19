@@ -39,6 +39,8 @@ Agent v3 提供两个独立 lane。AskTurn 对信息型问题执行一次有界�
 
 通用网页能力由独立 `WebSearchProvider` 提供 SearXNG、Brave 和 Tavily adapter。`web.read` 只接受无凭据 HTTPS 公网 URL，逐跳重新验证 DNS/IP 与重定向，限制内容类型、超时和解压后 2 MB 正文；连接器状态查询不联网，显式检查动作才执行健康探测。密钥只从桌面凭据管理器注入 sidecar，不进入状态、日志或 API 响应。
 
+模型通道由 Provider-neutral runtime 调用。Anthropic 使用官方 Python SDK 的原生 Messages、流式消息和 tool-use，并对可复用 Prompt 启用 ephemeral cache control；OpenAI、OpenRouter、Gemini、DeepSeek、Qwen、xAI、Groq、SiliconFlow、Kimi、Ollama、LM Studio 和自定义中转使用 Responses 或 Chat Completions 兼容 adapter。桌面端只向 sidecar 注入当前选中 Provider 的独立凭据；远程地址必须为 HTTPS，严格 loopback 地址可使用 HTTP 且允许无 Key。Provider 名称保留在审计记录中，但原始响应和密钥永不进入审计。
+
 能力注册表是权限真相。读取自动执行；`UICommand` 只允许前端白名单页面映射并保存 applied/dismissed receipt；项目、线程、Context、Canvas、对象记忆和候选论文等持久操作走 OperationBatch；Campaign 执行和阶段跃迁保留独立审批。模型永远不能获得 SQL、密钥、原始 Provider body、任意路径、DOM 或宿主命令。
 
 Runtime schema 2 保存 ContextManifest、Research checkpoint 和 UICommand。启动迁移前分别在线备份 `research.db` 与 `runtime.db`；runtime 初始化失败会恢复 runtime 备份。任一数据库 schema 高于应用支持版本时，Research Store、Runtime、Workspace、Campaign 与 Agent 写边界整体只读，读取与安全预览继续可用。

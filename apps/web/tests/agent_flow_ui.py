@@ -33,6 +33,12 @@ def api_get(path: str) -> dict:
         return json.loads(response.read().decode("utf-8"))
 
 
+def api_delete(path: str) -> dict:
+    request = urllib.request.Request(f"{API_URL}{path}", method="DELETE")
+    with urllib.request.urlopen(request, timeout=10) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
 def current_agent_task_id(page: Page) -> str:
     latest = page.locator(".conversation-turn.agent-turn").last
     return latest.get_attribute("data-agent-task-id") if latest.count() else ""
@@ -78,22 +84,64 @@ def assert_no_horizontal_overflow(page: Page) -> None:
     assert metrics["scrollWidth"] <= metrics["width"], metrics
 
 
-created_thread = api_post(
-    "/threads",
-    {
-        "title": "主路径网页验收",
-        "goal": "验证 Main Agent、上下文和 Atlas 的核心体验。",
-        "active_atlas_id": "I",
-    },
-)
+def choose_option(page: Page, label: str, option: str) -> None:
+    page.get_by_role("combobox", name=label).click()
+    page.get_by_role("option", name=option, exact=True).click()
+
+
 with sync_playwright() as playwright:
     browser = playwright.chromium.launch(headless=True)
     page = browser.new_page(viewport={"width": 1440, "height": 900})
     console_errors: list[str] = []
     page_errors: list[str] = []
+    http_failures: list[dict] = []
     page.on("console", lambda message: console_errors.append(message.text) if message.type == "error" else None)
     page.on("pageerror", lambda error: page_errors.append(str(error)))
+    page.on("response", lambda response: http_failures.append({"status": response.status, "url": response.url}) if response.status >= 400 else None)
     page.goto(BASE_URL, wait_until="networkidle")
+
+    page.locator(".first-run-shell").wait_for(state="visible")
+    assert page.locator(".workspace-create-dialog").count() == 0
+    assert page.get_by_role("heading", name="从一个问题开始").count() == 1
+    tour = page.get_by_role("dialog", name="先确认准备状态")
+    tour.wait_for(state="visible")
+    assert tour.get_attribute("aria-modal") == "false"
+    tour.get_by_role("button", name="下一步").click()
+    page.get_by_role("dialog", name="从一个问题开始").wait_for(state="visible")
+    page.evaluate("document.documentElement.style.zoom = '2'")
+    page.wait_for_timeout(120)
+    zoomed_callout = page.locator(".onboarding-callout").bounding_box()
+    assert zoomed_callout["x"] >= 0 and zoomed_callout["x"] + zoomed_callout["width"] <= page.evaluate("innerWidth"), zoomed_callout
+    assert page.locator(".first-run-composer textarea").is_visible()
+    page.screenshot(path=str(RESULTS / "first-run-200-percent.png"))
+    page.evaluate("document.documentElement.style.zoom = ''")
+    page.wait_for_timeout(120)
+    first_composer = page.locator(".first-run-composer textarea")
+    first_message = "你好，请简单介绍当前工作区"
+    first_composer.fill(first_message)
+    first_send = page.locator(".first-run-composer .send-button")
+    first_send.evaluate("node => { node.click(); node.click(); }")
+    page.locator(".app").wait_for(state="visible", timeout=20_000)
+    wait_for_new_agent(page)
+    first_threads = api_get("/threads")
+    assert len(first_threads) == 1, first_threads
+    assert first_threads[0]["title"] == first_message
+    first_thread = api_get(f"/threads/{first_threads[0]['id']}")
+    assert sum(1 for message in first_thread["messages"] if message["role"] == "user" and message["content"] == first_message) == 1
+    page.get_by_role("dialog", name="选择工作方式").get_by_role("button", name="下一步").click()
+    page.get_by_role("dialog", name="研究工作都在左侧").get_by_role("button", name="完成").click()
+    page.wait_for_function("localStorage.getItem('eai-onboarding-v1')?.includes('completed')")
+    api_delete(f"/threads/{first_threads[0]['id']}")
+
+    created_thread = api_post(
+        "/threads",
+        {
+            "title": "主路径网页验收",
+            "goal": "验证 Main Agent、上下文和 Atlas 的核心体验。",
+            "active_atlas_id": "I",
+        },
+    )
+    page.reload(wait_until="networkidle")
 
     try:
         page.locator(".home-surface").wait_for(state="visible")
@@ -139,9 +187,9 @@ with sync_playwright() as playwright:
     composer = page.locator(".composer textarea")
     composer.wait_for(state="visible")
     lane_switch = page.locator(".composer-lane-switch")
-    source_select = page.locator(".composer-source-select select")
+    source_select = page.get_by_role("combobox", name="来源范围")
     assert lane_switch.get_by_role("button", name="询问").get_attribute("class") == "active"
-    assert source_select.input_value() == "local_and_external"
+    assert source_select.get_attribute("data-value") == "local_and_external"
     assert "不修改工作区" in page.locator(".composer-execution-summary").inner_text()
     page.locator(".sidebar-footer button").last.click()
     page.locator(".settings-drawer").wait_for(state="visible")
@@ -156,8 +204,8 @@ with sync_playwright() as playwright:
     assert greeting.locator(".agent-run-trace").count() == 0
     assert greeting.locator(".agent-citations").count() == 0
     page.locator(".composer-lane-switch").get_by_role("button", name="研究任务").click()
-    assert page.get_by_role("combobox", name="期望产物").input_value() == "research_note"
-    assert page.get_by_role("combobox", name="研究深度").input_value() == "standard"
+    assert page.get_by_role("combobox", name="期望产物").get_attribute("data-value") == "research_note"
+    assert page.get_by_role("combobox", name="研究深度").get_attribute("data-value") == "standard"
     composer.fill("Compare current robot learning evidence?")
     composer.press("Enter")
     page.locator(".research-task-shelf").wait_for(state="visible", timeout=10_000)
@@ -188,9 +236,65 @@ with sync_playwright() as playwright:
     assert page.locator(".composer").count() == 0
     page.locator(".atlas-route-navigator").wait_for(state="visible")
     assert "路线" in page.locator(".atlas-route-navigator").inner_text()
-    assert page.locator(".atlas-filter-fields select").count() == 2
+    assert page.locator(".atlas-filter-fields .ui-select").count() == 2
     assert "43 篇正式" in atlas.inner_text()
     assert page.locator(".paper-evidence-dot").count() == page.locator(".timeline-paper").count()
+    year_labels = page.locator(".year-label").all_inner_texts()
+    numeric_years = [int(value) for value in year_labels if value.isdigit()]
+    assert numeric_years == sorted(numeric_years, reverse=True), numeric_years
+
+    zoom_value = page.locator(".atlas-zoom-value")
+    assert zoom_value.inner_text() == "100%"
+    page.locator(".timeline-shell").hover()
+    page.keyboard.down("Control")
+    page.mouse.wheel(0, -120)
+    page.keyboard.up("Control")
+    page.wait_for_function("document.querySelector('.atlas-zoom-value')?.textContent === '110%'")
+
+    timeline_shell = page.locator(".timeline-shell")
+    timeline_shell.evaluate("node => { node.scrollLeft = Math.min(220, node.scrollWidth - node.clientWidth); }")
+    pan_start = timeline_shell.evaluate("node => node.scrollLeft")
+    blank_point = page.evaluate(
+        """() => {
+          const shell = document.querySelector('.timeline-shell').getBoundingClientRect();
+          for (let y = shell.top + 120; y < shell.bottom - 24; y += 28) {
+            for (let x = shell.left + 110; x < shell.right - 24; x += 36) {
+              const target = document.elementFromPoint(x, y);
+              if (target && !target.closest('.timeline-paper, .timeline-edge-hit, button, input, select, textarea, a')) return { x, y };
+            }
+          }
+          throw new Error('No blank Atlas point found');
+        }"""
+    )
+    page.mouse.move(blank_point["x"], blank_point["y"])
+    page.mouse.down()
+    page.mouse.move(blank_point["x"] - 90, blank_point["y"], steps=5)
+    page.mouse.up()
+    pan_end = timeline_shell.evaluate("node => node.scrollLeft")
+    assert pan_end >= pan_start + 60, (pan_start, pan_end)
+
+    page.locator(".timeline-paper").first.click()
+    assert page.locator(".timeline-paper.selected").count() == 1
+    blank_point = page.evaluate(
+        """() => {
+          const shell = document.querySelector('.timeline-shell').getBoundingClientRect();
+          for (let y = shell.top + 120; y < shell.bottom - 24; y += 28) {
+            for (let x = shell.left + 110; x < shell.right - 24; x += 36) {
+              const target = document.elementFromPoint(x, y);
+              if (target && !target.closest('.timeline-paper, .timeline-edge-hit, button, input, select, textarea, a')) return { x, y };
+            }
+          }
+          throw new Error('No blank Atlas point found');
+        }"""
+    )
+    page.mouse.click(blank_point["x"], blank_point["y"])
+    page.wait_for_function("document.querySelectorAll('.timeline-paper.selected').length === 0")
+    if page.locator(".right-rail:not(.collapsed) .rail-close").count():
+        page.locator(".right-rail:not(.collapsed) .rail-close").click()
+        page.wait_for_timeout(280)
+
+    zoom_value.click()
+    page.wait_for_function("document.querySelector('.atlas-zoom-value')?.textContent === '100%'")
     page.screenshot(path=str(RESULTS / "atlas-default-desktop.png"))
 
     main_width = page.locator(".main").bounding_box()["width"]
@@ -201,6 +305,10 @@ with sync_playwright() as playwright:
     paper.click()
     page.locator(".right-rail:not(.collapsed)").wait_for(state="visible")
     page.wait_for_timeout(280)
+    assert page.locator(".timeline-paper.dimmed").count() > 0
+    assert page.locator(".timeline-paper.selected.dimmed").count() == 0
+    dimmed_opacity = float(page.locator(".timeline-paper.dimmed").first.evaluate("node => getComputedStyle(node).opacity"))
+    assert dimmed_opacity <= 0.2, dimmed_opacity
     pushed_main_width = page.locator(".main").bounding_box()["width"]
     assert main_width - pushed_main_width >= 318, (main_width, pushed_main_width)
     visibility = page.evaluate(
@@ -269,7 +377,7 @@ with sync_playwright() as playwright:
     page.locator(".context-drawer .ui-drawer-header button").click()
 
     user_count = page.locator(".conversation-turn.user-turn").count()
-    page.locator(".composer-source-select select").select_option("local_only")
+    choose_option(page, "来源范围", "仅本地")
     previous_task_id = current_agent_task_id(page)
     composer.fill("请基于当前 Atlas 检索最相关的论文，并说明下一步。")
     composer.press("Enter")
@@ -322,7 +430,7 @@ with sync_playwright() as playwright:
     page.locator(".timeline-paper.selected .paper-node-actions button").first.click()
     page.locator(".agent-thread-surface").wait_for(state="visible")
     page.locator(".composer-lane-switch").get_by_role("button", name="询问").click()
-    page.locator(".composer-source-select select").select_option("local_and_external")
+    choose_option(page, "来源范围", "全部来源")
     composer = page.locator(".composer textarea")
     composer.fill("把这篇论文保存为长期资料")
     composer.press("Enter")
@@ -454,7 +562,7 @@ with sync_playwright() as playwright:
     narrow.locator(".atlas-surface").wait_for(state="visible")
     narrow.locator(".atlas-filter-toggle").click()
     narrow.locator(".atlas-filter-fields.open").wait_for(state="visible")
-    assert narrow.locator(".atlas-filter-fields.open select").count() == 2
+    assert narrow.locator(".atlas-filter-fields.open .ui-select").count() == 2
     fully_visible_cards = narrow.evaluate(
         """() => [...document.querySelectorAll('.timeline-paper')].filter((node) => {
           const rect = node.getBoundingClientRect();
@@ -515,7 +623,10 @@ with sync_playwright() as playwright:
     )
     reduced_context.close()
 
-    assert not console_errors, console_errors
+    unexpected_http_failures = [failure for failure in http_failures if not (failure["status"] == 409 and "/draft" in failure["url"])]
+    unexpected_console_errors = [message for message in console_errors if not ("409 (Conflict)" in message and any(failure["status"] == 409 and "/draft" in failure["url"] for failure in http_failures))]
+    assert not unexpected_http_failures, unexpected_http_failures
+    assert not unexpected_console_errors, unexpected_console_errors
     assert not page_errors, page_errors
     print(json.dumps({"desktop_turns": page.locator(".conversation-turn").count(), "medium_width": medium.viewport_size["width"], "narrow_main_width": main_box["width"]}, ensure_ascii=False))
     browser.close()

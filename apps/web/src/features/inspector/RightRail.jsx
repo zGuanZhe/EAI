@@ -5,7 +5,7 @@ import {
   PanelRight, Pencil, Plus, Search, Send, Sparkles, SquareDashedMousePointer, X
 } from "lucide-react";
 import { buildAtlasOverview } from "../../atlasUtils.js";
-import { InlineNotice } from "../../components/ui/index.jsx";
+import { InlineNotice, Select } from "../../components/ui/index.jsx";
 import { NODE_LABELS, TASK_STATUS_LABELS } from "../canvas/model.js";
 import { AgentApprovalInspector } from "./AgentApprovalInspector.jsx";
 import { ChangeSetInspector } from "../thread/ChangeSetInspector.jsx";
@@ -541,30 +541,15 @@ function AtlasControlRail({
         <div className="rail-control-grid">
           <label>
             <span>层级</span>
-            <select value={controls.tierFilter} onChange={(event) => controls.setTierFilter(event.target.value)}>
-              <option value="all">全部</option>
-              {controls.tiers.map((tier) => (
-                <option key={tier} value={tier}>{tier}</option>
-              ))}
-            </select>
+            <Select value={controls.tierFilter} options={[{ value: "all", label: "全部" }, ...controls.tiers.map((tier) => ({ value: tier, label: String(tier) }))]} onChange={controls.setTierFilter} ariaLabel="筛选层级" compact tone="cyan" />
           </label>
           <label>
             <span>路线</span>
-            <select value={controls.routeFilter} onChange={(event) => controls.setRouteFilter(event.target.value)}>
-              <option value="all">全部</option>
-              {controls.routes.map((route) => (
-                <option key={route.id} value={route.id}>{route.label}</option>
-              ))}
-            </select>
+            <Select value={controls.routeFilter} options={[{ value: "all", label: "全部" }, ...controls.routes.map((route) => ({ value: route.id, label: route.label }))]} onChange={controls.setRouteFilter} ariaLabel="筛选路线" compact tone="cyan" />
           </label>
           <label>
             <span>年份</span>
-            <select value={controls.yearFilter} onChange={(event) => controls.setYearFilter(event.target.value)}>
-              <option value="all">全部</option>
-              {controls.years.map((year) => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
+            <Select value={controls.yearFilter} options={[{ value: "all", label: "全部" }, ...controls.years.map((year) => ({ value: year, label: String(year) }))]} onChange={controls.setYearFilter} ariaLabel="筛选年份" compact tone="cyan" />
           </label>
         </div>
 
@@ -776,12 +761,12 @@ function CandidateInspector({ candidate, onUpdate, onApply, onAddCard, onOpenPap
         </label>
         <label>
           <span>状态</span>
-          <select value={draft.status} onChange={(event) => update("status", event.target.value)}>
-            <option value="pending">待审</option>
-            <option value="deferred">暂缓</option>
-            <option value="rejected">驳回</option>
-            <option value="applied">已应用</option>
-          </select>
+          <Select value={draft.status} options={[
+            { value: "pending", label: "待审" },
+            { value: "deferred", label: "暂缓" },
+            { value: "rejected", label: "驳回" },
+            { value: "applied", label: "已应用" }
+          ]} onChange={(value) => update("status", value)} ariaLabel="候选状态" />
         </label>
         <label className="wide">
           <span>为什么值得纳入</span>
@@ -990,7 +975,7 @@ function CanvasNodeInspector({ detail, templates, onRecommendedTemplate }) {
       <span className="detail-type">{NODE_LABELS[node.type] || node.type}</span>
       <label><span>标题</span><input value={title} onChange={(event) => setTitle(event.target.value)} /></label>
       <label><span>说明</span><textarea value={body} onChange={(event) => setBody(event.target.value)} /></label>
-      {node.type === "task" && <div className="canvas-node-fields"><label><span>状态</span><select value={status} onChange={(event) => setNodeStatus(event.target.value)}>{Object.entries(TASK_STATUS_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label><label><span>优先级</span><input type="number" min="0" max="3" value={priority} onChange={(event) => setPriority(Number(event.target.value))} /></label></div>}
+      {node.type === "task" && <div className="canvas-node-fields"><label><span>状态</span><Select value={status} options={Object.entries(TASK_STATUS_LABELS).map(([value, label]) => ({ value, label }))} onChange={setNodeStatus} ariaLabel="任务状态" /></label><label><span>优先级</span><input type="number" min="0" max="3" value={priority} onChange={(event) => setPriority(Number(event.target.value))} /></label></div>}
       <button className="primary-button wide" type="button" onClick={() => detail.onUpdate?.({ title: title.trim() || node.title, body, ...(node.type === "task" ? { status, priority } : {}) })}><Check size={14} />保存节点</button>
       {["task", "hypothesis"].includes(node.type) && <InlineNotice tone="info" title="Campaign 入口">在 Canvas 顶部切换到 Campaign，从当前问题或假设生成研究想法并启动隔离实验。</InlineNotice>}
     </div>

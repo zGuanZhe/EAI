@@ -35,7 +35,8 @@ describe("WorkspaceCreateDialog", () => {
 
     await user.type(screen.getByLabelText("问题标题"), "视觉检索证据瓶颈");
     await user.type(screen.getByLabelText("研究问题"), "哪些证据能区分索引缺失与模型能力不足？");
-    await user.selectOptions(screen.getByLabelText("起始 Atlas"), "H");
+    await user.click(screen.getByLabelText("起始 Atlas"));
+    await user.click(screen.getByRole("option", { name: "H · 多模态" }));
     await user.click(screen.getByRole("button", { name: "创建研究问题" }));
 
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("服务暂时不可用"));

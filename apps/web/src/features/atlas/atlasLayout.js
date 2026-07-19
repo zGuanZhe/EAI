@@ -1,3 +1,42 @@
+export const ATLAS_ZOOM_MIN = 0.75;
+export const ATLAS_ZOOM_MAX = 1.4;
+export const ATLAS_ZOOM_STEP = 0.1;
+
+export function normalizePublicationYear(value) {
+  const normalized = String(value ?? "").trim();
+  return normalized || "----";
+}
+
+function publicationYearRank(value) {
+  const matches = normalizePublicationYear(value).match(/(?:19|20)\d{2}/g);
+  if (matches?.length) return Math.max(...matches.map(Number));
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : Number.NEGATIVE_INFINITY;
+}
+
+export function sortPublicationYearsDescending(values) {
+  return [...new Set(values.map(normalizePublicationYear))].sort((a, b) => {
+    const aRank = publicationYearRank(a);
+    const bRank = publicationYearRank(b);
+    if (aRank !== bRank) {
+      if (!Number.isFinite(aRank)) return 1;
+      if (!Number.isFinite(bRank)) return -1;
+      return bRank - aRank;
+    }
+    return b.localeCompare(a, "zh-CN", { numeric: true });
+  });
+}
+
+export function clampAtlasZoom(value) {
+  const clamped = Math.min(ATLAS_ZOOM_MAX, Math.max(ATLAS_ZOOM_MIN, value));
+  return Math.round(clamped * 100) / 100;
+}
+
+export function nextAtlasZoom(current, wheelDelta) {
+  if (!wheelDelta) return clampAtlasZoom(current);
+  return clampAtlasZoom(current + (wheelDelta < 0 ? ATLAS_ZOOM_STEP : -ATLAS_ZOOM_STEP));
+}
+
 export function computeAtlasPositions({
   papers,
   routes,
@@ -16,19 +55,20 @@ export function computeAtlasPositions({
   let y = headerHeight;
 
   years.forEach((year) => {
-    const perLaneCounts = routes.map((route) => papers.filter((paper) => (paper.year || "----") === year && getRouteId(paper) === route.id).length);
+    const normalizedYear = normalizePublicationYear(year);
+    const perLaneCounts = routes.map((route) => papers.filter((paper) => normalizePublicationYear(paper.year) === normalizedYear && getRouteId(paper) === route.id).length);
     const rowHeight = Math.max(minRowHeight, Math.max(...perLaneCounts, 1) * (cardHeight + cardGap) + 30);
-    yearRows.push({ year, y, height: rowHeight });
+    yearRows.push({ year: normalizedYear, y, height: rowHeight });
     routes.forEach((route, routeIndex) => {
       const lanePapers = papers
-        .filter((paper) => (paper.year || "----") === year && getRouteId(paper) === route.id)
+        .filter((paper) => normalizePublicationYear(paper.year) === normalizedYear && getRouteId(paper) === route.id)
         .sort((a, b) => Number(Boolean(b.star)) - Number(Boolean(a.star)) || a.title.localeCompare(b.title));
       lanePapers.forEach((paper, paperIndex) => {
         positions.set(paper.id, {
           x: yearWidth + routeIndex * laneWidth + 18,
           y: y + 18 + paperIndex * (cardHeight + cardGap),
           routeIndex,
-          year
+          year: normalizedYear
         });
       });
     });

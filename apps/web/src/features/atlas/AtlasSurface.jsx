@@ -1,9 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from "lucide-react";
 import { AtlasPaperNode } from "./AtlasPaperNode.jsx";
 import { AtlasRelationLayer } from "./AtlasRelationLayer.jsx";
 import { AtlasToolbar } from "./AtlasToolbar.jsx";
-import { computeAtlasPositions, computeHorizontalRevealDelta } from "./atlasLayout.js";
+import {
+  ATLAS_ZOOM_MAX,
+  ATLAS_ZOOM_MIN,
+  clampAtlasZoom,
+  computeAtlasPositions,
+  computeHorizontalRevealDelta,
+  nextAtlasZoom,
+  normalizePublicationYear,
+  sortPublicationYearsDescending
+} from "./atlasLayout.js";
 import {
   FALLBACK_COLORS, cardKey, cx, getPaperLevel, getPaperRouteId, getPaperRouteName,
   objectMemoryKey, routeLabel, routeShort, tokenEstimate
@@ -41,10 +50,12 @@ export function AtlasSurface({
   const [hoveredRelationId, setHoveredRelationId] = useState(null);
   const [lockedRelationId, setLockedRelationId] = useState(null);
   const [isPanning, setIsPanning] = useState(false);
+  const [viewScale, setViewScale] = useState(1);
   const [viewport, setViewport] = useState({ left: 0, top: 0, width: 1200, height: 900 });
   const shellRef = useRef(null);
   const paperNodeRefs = useRef(new Map());
   const panRef = useRef(null);
+  const zoomAnchorRef = useRef(null);
 
   useEffect(() => {
     setSelectedId(null);
@@ -224,7 +235,7 @@ export function AtlasSurface({
       containerRight: shellRect.right,
       nodeLeft: nodeRect.left,
       nodeRight: nodeRect.right,
-      leadingInset: graph.yearWidth + 18,
+      leadingInset: (graph.yearWidth + 18) * viewScale,
       trailingInset: 24,
       occluderLeft: overlapsShell ? railRect.left : null
     });
@@ -232,7 +243,7 @@ export function AtlasSurface({
   }
 
   function clearFocus(event) {
-    if (event.target.closest?.(".timeline-paper, .timeline-edges, .atlas-relation, .timeline-edge, .timeline-edge-hit, .paper-add, .paper-expand")) return;
+    if (event.target.closest?.(".timeline-paper, .atlas-relation, .timeline-edge, .timeline-edge-hit, .paper-add, .paper-expand")) return;
     setSelectedId(null);
     setLockedRelationId(null);
     onClearDetail?.();
@@ -240,7 +251,7 @@ export function AtlasSurface({
 
   function canStartPan(event) {
     if (event.button !== 0) return false;
-    return !event.target.closest?.(".timeline-paper, .timeline-edges, .atlas-relation, .timeline-edge, .timeline-edge-hit, .paper-add, .paper-expand, button, input, select, textarea, a");
+    return !event.target.closest?.(".timeline-paper, .atlas-relation, .timeline-edge, .timeline-edge-hit, .paper-add, .paper-expand, button, input, select, textarea, a");
   }
 
   function startPan(event) {
@@ -287,20 +298,60 @@ export function AtlasSurface({
     setIsPanning(false);
   }
 
-  function handleWheel(event) {
-    if (!event.shiftKey) return;
-    event.currentTarget.scrollLeft += event.deltaY + event.deltaX;
-    event.preventDefault();
+  function changeViewScale(nextScale, clientPoint = null) {
+    const scale = clampAtlasZoom(nextScale);
+    const shell = shellRef.current;
+    if (!shell || scale === viewScale) return;
+    const rect = shell.getBoundingClientRect();
+    const pointerX = clientPoint ? clientPoint.x - rect.left : shell.clientWidth / 2;
+    const pointerY = clientPoint ? clientPoint.y - rect.top : shell.clientHeight / 2;
+    zoomAnchorRef.current = {
+      pointerX,
+      pointerY,
+      logicalX: (shell.scrollLeft + pointerX) / viewScale,
+      logicalY: (shell.scrollTop + pointerY) / viewScale
+    };
+    setViewScale(scale);
   }
 
-  function updateViewport(shell) {
+  function updateViewport(shell, scale = viewScale) {
     setViewport({
-      left: shell.scrollLeft,
-      top: Math.max(0, shell.scrollTop - 90),
-      width: shell.clientWidth || 1200,
-      height: shell.clientHeight || 900
+      left: shell.scrollLeft / scale,
+      top: Math.max(0, shell.scrollTop / scale - 90),
+      width: (shell.clientWidth || 1200) / scale,
+      height: (shell.clientHeight || 900) / scale
     });
   }
+
+  useLayoutEffect(() => {
+    const shell = shellRef.current;
+    const anchor = zoomAnchorRef.current;
+    if (!shell || !anchor) return;
+    zoomAnchorRef.current = null;
+    shell.scrollLeft = Math.max(0, anchor.logicalX * viewScale - anchor.pointerX);
+    shell.scrollTop = Math.max(0, anchor.logicalY * viewScale - anchor.pointerY);
+    updateViewport(shell, viewScale);
+  }, [viewScale]);
+
+  useEffect(() => {
+    const shell = shellRef.current;
+    if (!shell) return undefined;
+    const handleWheel = (event) => {
+      if (event.ctrlKey) {
+        event.preventDefault();
+        changeViewScale(nextAtlasZoom(viewScale, event.deltaY || event.deltaX), {
+          x: event.clientX,
+          y: event.clientY
+        });
+        return;
+      }
+      if (!event.shiftKey) return;
+      event.preventDefault();
+      shell.scrollLeft += event.deltaY + event.deltaX;
+    };
+    shell.addEventListener("wheel", handleWheel, { passive: false });
+    return () => shell.removeEventListener("wheel", handleWheel);
+  }, [viewScale]);
 
   useEffect(() => {
     if (!graph) {
@@ -366,13 +417,13 @@ export function AtlasSurface({
     const shell = shellRef.current;
     if (shell) {
       shell.scrollTo({
-        left: Math.max(0, pos.x - 96),
-        top: Math.max(0, pos.y - 20),
+        left: Math.max(0, (pos.x - 96) * viewScale),
+        top: Math.max(0, (pos.y - 20) * viewScale),
         behavior: "smooth"
       });
     }
     onFocusHandled?.();
-  }, [focusPaperId, graph]);
+  }, [focusPaperId, graph, viewScale]);
 
   useEffect(() => {
     const shell = shellRef.current;
@@ -392,7 +443,7 @@ export function AtlasSurface({
       cancelAnimationFrame(frame);
       observer.disconnect();
     };
-  }, [graph?.width, graph?.height, selectedId, inspectorOpen]);
+  }, [graph?.width, graph?.height, selectedId, inspectorOpen, viewScale]);
 
   useEffect(() => {
     if (!selectedId) return undefined;
@@ -408,14 +459,14 @@ export function AtlasSurface({
       cancelAnimationFrame(frame);
       appShell?.removeEventListener("transitionend", finishLayout);
     };
-  }, [selectedId, inspectorOpen, graph?.yearWidth]);
+  }, [selectedId, inspectorOpen, graph?.yearWidth, viewScale]);
 
   if (!bundle || !graph) {
     return <div className="empty-panel">正在加载 Atlas {activeAtlas}...</div>;
   }
 
   const leadingRoute = [...graph.routeStats].sort((a, b) => b.count - a.count)[0];
-  const latestYear = [...graph.yearStats].sort((a, b) => Number(b.year) - Number(a.year))[0];
+  const latestYear = graph.yearStats[0];
   const trendSummary = `${latestYear?.year || "近期"} 年的活跃工作主要集中在${leadingRoute?.label ? `“${leadingRoute.label}”` : "主要研究路线"}，可结合关系线判断方法演化与证据缺口。`;
   const firstVisibleRoute = Math.max(1, Math.floor(Math.max(0, viewport.left - graph.yearWidth) / graph.laneWidth) + 1);
   const lastVisibleRoute = Math.min(graph.routes.length, Math.ceil(Math.max(0, viewport.left + viewport.width - graph.yearWidth) / graph.laneWidth));
@@ -423,7 +474,7 @@ export function AtlasSurface({
   const scrollProgress = maxScrollLeft ? Math.min(1, viewport.left / maxScrollLeft) : 0;
 
   function scrollRoutes(direction) {
-    shellRef.current?.scrollBy({ left: direction * graph.laneWidth * 2, behavior: "smooth" });
+    shellRef.current?.scrollBy({ left: direction * graph.laneWidth * 2 * viewScale, behavior: "smooth" });
   }
 
   return (
@@ -453,6 +504,11 @@ export function AtlasSurface({
         <button type="button" title="向左查看路线" disabled={viewport.left <= 2} onClick={() => scrollRoutes(-1)}><ChevronLeft size={15} /></button>
         <div className="atlas-route-progress" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(0.04, scrollProgress)})` }} /></div>
         <span>路线 {firstVisibleRoute}-{Math.max(firstVisibleRoute, lastVisibleRoute)} / {graph.routes.length}</span>
+        <div className="atlas-zoom-controls" aria-label="论文表大小">
+          <button type="button" title="缩小论文表" disabled={viewScale <= ATLAS_ZOOM_MIN} onClick={() => changeViewScale(viewScale - 0.1)}><ZoomOut size={14} /></button>
+          <button type="button" className="atlas-zoom-value" title="重置论文表大小" disabled={viewScale === 1} onClick={() => changeViewScale(1)}>{Math.round(viewScale * 100)}%</button>
+          <button type="button" title="放大论文表" disabled={viewScale >= ATLAS_ZOOM_MAX} onClick={() => changeViewScale(viewScale + 0.1)}><ZoomIn size={14} /></button>
+        </div>
         <button type="button" title="向右查看路线" disabled={viewport.left >= maxScrollLeft - 2} onClick={() => scrollRoutes(1)}><ChevronRight size={15} /></button>
       </nav>
       <div
@@ -462,13 +518,13 @@ export function AtlasSurface({
         onPointerMove={movePan}
         onPointerUp={endPan}
         onPointerCancel={endPan}
-        onWheelCapture={handleWheel}
         onScroll={(event) => updateViewport(event.currentTarget)}
       >
         <div
           className="timeline-header"
           style={{
             width: graph.width,
+            zoom: viewScale,
             gridTemplateColumns: `${graph.yearWidth}px repeat(${graph.routes.length}, ${graph.laneWidth}px)`
           }}
         >
@@ -492,7 +548,7 @@ export function AtlasSurface({
             </div>
           ))}
         </div>
-        <div className="timeline-map" style={{ width: graph.width, height: graph.height }} onClick={clearFocus}>
+        <div className="timeline-map" style={{ width: graph.width, height: graph.height, zoom: viewScale }} onClick={clearFocus}>
           <AtlasRelationLayer
             graph={graph}
             relations={renderedEdges}
@@ -559,6 +615,7 @@ export function AtlasSurface({
                 memory={memory}
                 selected={isSelected}
                 related={isRelated}
+                dimmed={Boolean(selectedId && !isRelated)}
                 relationHighlighted={relationHighlighted}
                 inPath={inPath}
                 pathIndex={pathIndex}
@@ -629,7 +686,7 @@ function computeTimeline(bundle, filters, atlasUpdates = null) {
   const routeMap = new Map(routes.map((route) => [route.id, route]));
   const routeColors = new Map(routes.map((route, index) => [route.id, route.color || FALLBACK_COLORS[index % FALLBACK_COLORS.length]]));
   const routeBgs = new Map(routes.map((route, index) => [route.id, tint(route.color || FALLBACK_COLORS[index % FALLBACK_COLORS.length])]));
-  const allYears = [...new Set(allPapers.map((paper) => paper.year).filter(Boolean))].sort((a, b) => b - a);
+  const allYears = sortPublicationYearsDescending(allPapers.map((paper) => paper.year));
   const tiers = [...new Set(allPapers.map(getPaperLevel).filter(Boolean))].sort();
 
   const q = filters.query.trim().toLowerCase();
@@ -658,7 +715,7 @@ function computeTimeline(bundle, filters, atlasUpdates = null) {
 
   const paperMap = new Map(papers.map((paper) => [paper.id, paper]));
   const relations = (bundle.relations || []).filter((rel) => paperMap.has(rel.source) && paperMap.has(rel.target));
-  const years = [...new Set(papers.map((paper) => paper.year || "----"))].sort((a, b) => Number(b) - Number(a));
+  const years = sortPublicationYearsDescending(papers.map((paper) => paper.year));
   const layout = computeAtlasPositions({ papers, routes, years, getRouteId: getPaperRouteId });
 
   const coreCount = papers.filter((paper) => /core|核心/i.test(getPaperLevel(paper))).length;
@@ -673,7 +730,7 @@ function computeTimeline(bundle, filters, atlasUpdates = null) {
   }));
   const yearStats = years.map((year) => ({
     year,
-    count: papers.filter((paper) => (paper.year || "----") === year).length
+    count: papers.filter((paper) => normalizePublicationYear(paper.year) === year).length
   }));
 
   return {

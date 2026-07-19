@@ -2,7 +2,7 @@ import { FolderPlus, MessageSquarePlus, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { Button, IconButton } from "../../components/ui/index.jsx";
+import { Button, IconButton, Select } from "../../components/ui/index.jsx";
 
 const FOCUSABLE = "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])";
 
@@ -142,13 +142,13 @@ export function WorkspaceCreateDialog({
           </label>
           <label>
             <span>{isProject ? "默认 Atlas" : "起始 Atlas"}</span>
-            <select value={atlasId} onChange={(event) => setAtlasId(event.target.value)} disabled={submitting}>
-              {atlases.map((atlas) => (
-                <option key={atlas.id} value={atlas.id}>
-                  {atlas.id} · {atlas.title_cn || atlas.title}
-                </option>
-              ))}
-            </select>
+            <Select
+              value={atlasId}
+              options={atlases.map((atlas) => ({ value: atlas.id, label: `${atlas.id} · ${atlas.title_cn || atlas.title}` }))}
+              onChange={setAtlasId}
+              disabled={submitting}
+              ariaLabel={isProject ? "默认 Atlas" : "起始 Atlas"}
+            />
           </label>
           {error && <div className="workspace-create-error" role="alert">{error}</div>}
           <footer>

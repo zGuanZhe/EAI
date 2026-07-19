@@ -15,6 +15,21 @@ use tauri_plugin_shell::{
 };
 use url::{Host, Url};
 
+const MODEL_PROVIDERS: &[&str] = &[
+    "openai",
+    "openrouter",
+    "anthropic",
+    "gemini",
+    "deepseek",
+    "dashscope",
+    "xai",
+    "groq",
+    "siliconflow",
+    "moonshot",
+    "ollama",
+    "lmstudio",
+];
+
 #[derive(Clone, Serialize)]
 struct RuntimeInfo {
     api_root: String,
@@ -128,15 +143,27 @@ fn credential(provider: &str) -> Option<String> {
 
 fn provider_key(provider: &str) -> Option<String> {
     credential(provider).or_else(|| {
-        let variable = if provider == "openrouter" {
-            "OPENROUTER_API_KEY"
-        } else {
-            "OPENAI_API_KEY"
+        let variable = match provider {
+            "openrouter" => "OPENROUTER_API_KEY",
+            "anthropic" => "ANTHROPIC_API_KEY",
+            _ => "OPENAI_API_KEY",
         };
         std::env::var(variable)
             .ok()
             .filter(|value| !value.trim().is_empty())
     })
+}
+
+fn is_loopback_url(value: &str) -> bool {
+    let Ok(parsed) = Url::parse(value) else {
+        return false;
+    };
+    match parsed.host() {
+        Some(Host::Domain(host)) => host.eq_ignore_ascii_case("localhost"),
+        Some(Host::Ipv4(address)) => address.is_loopback(),
+        Some(Host::Ipv6(address)) => address.is_loopback(),
+        None => false,
+    }
 }
 
 fn web_search_key(provider: &str) -> Option<String> {
@@ -183,14 +210,23 @@ fn validate_provider_config(mut config: ProviderConfig) -> Result<ProviderConfig
         .trim()
         .trim_end_matches('/')
         .to_string();
-    if !matches!(config.provider.as_str(), "openrouter" | "openai") {
+    if !MODEL_PROVIDERS.contains(&config.provider.as_str()) {
         return Err("无效的 Provider".into());
     }
     if config.model.is_empty() || config.model.len() > 160 {
         return Err("模型名称不能为空且不能超过 160 个字符".into());
     }
-    if !matches!(config.api_format.as_str(), "chat" | "responses") {
-        return Err("API 格式必须是 chat 或 responses".into());
+    if !matches!(
+        config.api_format.as_str(),
+        "chat" | "responses" | "anthropic"
+    ) {
+        return Err("API 格式必须是 chat、responses 或 anthropic".into());
+    }
+    if config.provider == "anthropic" && config.api_format != "anthropic" {
+        return Err("Anthropic Provider 必须使用 Messages API".into());
+    }
+    if config.provider != "anthropic" && config.api_format == "anthropic" {
+        return Err("Anthropic Messages 仅用于 Anthropic Provider".into());
     }
     if !matches!(
         config.web_search_provider.as_str(),
@@ -318,10 +354,19 @@ async fn launch_backend(app: AppHandle) -> Result<(), String> {
     command = command
         .env("OPENROUTER_API_KEY", "")
         .env("OPENAI_API_KEY", "")
+        .env("ANTHROPIC_API_KEY", "")
+        .env("EAI_MODEL_PROVIDER", &provider.provider)
         .env("EAI_WEB_SEARCH_PROVIDER", "")
         .env("EAI_WEB_SEARCH_BASE_URL", "")
         .env("EAI_WEB_SEARCH_API_KEY", "");
-    if provider.provider == "openrouter" {
+    if provider.provider == "anthropic" {
+        command = command
+            .env("ANTHROPIC_BASE_URL", &provider.base_url)
+            .env("ANTHROPIC_MODEL", &provider.model);
+        if let Some(value) = provider_key("anthropic") {
+            command = command.env("ANTHROPIC_API_KEY", value);
+        }
+    } else if provider.provider == "openrouter" {
         command = command
             .env("OPENROUTER_BASE_URL", &provider.base_url)
             .env("OPENROUTER_MODEL", &provider.model);
@@ -333,8 +378,10 @@ async fn launch_backend(app: AppHandle) -> Result<(), String> {
             .env("OPENAI_BASE_URL", &provider.base_url)
             .env("OPENAI_MODEL", &provider.model)
             .env("OPENAI_API_FORMAT", &provider.api_format);
-        if let Some(value) = provider_key("openai") {
+        if let Some(value) = provider_key(&provider.provider) {
             command = command.env("OPENAI_API_KEY", value);
+        } else if is_loopback_url(&provider.base_url) {
+            command = command.env("OPENAI_API_KEY", "local-no-key");
         }
     }
     if !provider.web_search_provider.is_empty() {
@@ -538,7 +585,7 @@ async fn save_provider_config(
             .set_password(value.trim())
             .map_err(|error| error.to_string())?;
     }
-    if provider_key(&config.provider).is_none() {
+    if provider_key(&config.provider).is_none() && !is_loopback_url(&config.base_url) {
         return Err("请输入 API Key".into());
     }
     if let Some(value) = web_search_secret.filter(|value| !value.trim().is_empty()) {
@@ -577,7 +624,7 @@ async fn set_provider_secret(
     provider: String,
     secret: String,
 ) -> Result<(), String> {
-    if !matches!(provider.as_str(), "openrouter" | "openai") || secret.trim().is_empty() {
+    if !MODEL_PROVIDERS.contains(&provider.as_str()) || secret.trim().is_empty() {
         return Err("无效的 Provider 或密钥".into());
     }
     keyring::Entry::new("EAI Desktop", &provider)
@@ -589,7 +636,7 @@ async fn set_provider_secret(
 
 #[tauri::command]
 async fn clear_provider_secret(app: AppHandle, provider: String) -> Result<(), String> {
-    if !matches!(provider.as_str(), "openrouter" | "openai") {
+    if !MODEL_PROVIDERS.contains(&provider.as_str()) {
         return Err("无效的 Provider".into());
     }
     if let Ok(entry) = keyring::Entry::new("EAI Desktop", &provider) {
@@ -641,7 +688,8 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::{
-        copy_directory_if_missing, select_app_data_dir, validate_provider_config, ProviderConfig,
+        copy_directory_if_missing, is_loopback_url, select_app_data_dir, validate_provider_config,
+        ProviderConfig, MODEL_PROVIDERS,
     };
     use std::fs;
 
@@ -728,5 +776,53 @@ mod tests {
         assert!(config.web_search_provider.is_empty());
         assert!(config.web_search_base_url.is_empty());
         assert!(validate_provider_config(config).is_ok());
+    }
+
+    #[test]
+    fn provider_catalog_accepts_compatible_presets_and_native_anthropic() {
+        let config = |provider: &str, base_url: &str, api_format: &str| ProviderConfig {
+            provider: provider.into(),
+            base_url: base_url.into(),
+            model: "test-model".into(),
+            api_format: api_format.into(),
+            web_search_provider: String::new(),
+            web_search_base_url: String::new(),
+        };
+        for provider in MODEL_PROVIDERS {
+            let format = if *provider == "anthropic" {
+                "anthropic"
+            } else {
+                "chat"
+            };
+            assert!(validate_provider_config(config(
+                provider,
+                "https://provider.example/v1",
+                format
+            ))
+            .is_ok());
+        }
+        assert!(
+            validate_provider_config(config("anthropic", "https://api.anthropic.com", "chat"))
+                .is_err()
+        );
+        assert!(validate_provider_config(config(
+            "openai",
+            "https://api.openai.com/v1",
+            "anthropic"
+        ))
+        .is_err());
+        assert!(
+            validate_provider_config(config("unknown", "https://provider.example/v1", "chat"))
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn keyless_model_endpoints_are_limited_to_loopback() {
+        assert!(is_loopback_url("http://127.0.0.1:11434/v1"));
+        assert!(is_loopback_url("http://localhost:1234/v1"));
+        assert!(is_loopback_url("http://[::1]:8080/v1"));
+        assert!(!is_loopback_url("https://api.example/v1"));
+        assert!(!is_loopback_url("not-a-url"));
     }
 }

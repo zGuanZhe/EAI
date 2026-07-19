@@ -1,4 +1,4 @@
-# EAI Desktop 1.0 Product
+# EAI Desktop 1.0.1 Product
 
 ## Product
 
@@ -6,7 +6,7 @@ EAI Desktop is a Codex-like personal research workspace for turning paper graphs
 
 Agent v3 exposes four explicit product outcomes. `询问` handles daily questions; informational questions perform one bounded parallel retrieval over every allowed and configured local, Atlas, academic and web source, while greetings and text transformations do not search. `研究任务` runs a checkpointed evidence investigation in the background without occupying the Composer. A completed investigation can be explicitly promoted to a Research Campaign. System operations are limited to registered EAI capabilities: reads and restricted navigation are automatic, durable writes use confirmed OperationBatch receipts and safe undo, and experiments or Campaign stage transitions retain their own approvals.
 
-An OpenAI-compatible model endpoint is only a model channel. EAI never assumes it provides web search. Generic web retrieval requires an independently configured SearXNG, Brave or Tavily connector; unavailable connectors are shown as unavailable and cannot be simulated by model claims.
+The model channel supports native Anthropic Messages plus OpenAI Responses/Chat Completions compatible endpoints. Presets cover OpenAI, OpenRouter, Gemini, DeepSeek, Qwen, xAI, Groq, SiliconFlow, Kimi, Ollama and LM Studio while keeping model IDs and base URLs editable. EAI never assumes a model endpoint provides web search. Generic web retrieval requires an independently configured SearXNG, Brave or Tavily connector; unavailable connectors are shown as unavailable and cannot be simulated by model claims.
 
 ## Main Loop
 
@@ -48,6 +48,8 @@ Every visible primary action must serve one of those steps. Capabilities outside
 
 ## Success Criteria
 
+- A fresh empty workspace opens directly on a useful welcome Composer instead of forcing project or thread setup. The first real question creates exactly one thread under the current project or Unfiled Work, then launches the selected AskTurn or ResearchTask without truncating or duplicating the message.
+- First-run guidance is optional, non-blocking, replayable, and limited to the four concepts needed to reach a first useful answer: model readiness, the Composer, lane/source controls, and workspace navigation.
 - Users always know which project, thread, backend root, personal data directory, and Atlas cache they are using.
 - Plain input starts a durable Agent v3 AskTurn or ResearchTask; `/atlas`, `/context`, and `/tools` remain explicit user commands.
 - Ordinary conversation has no tool, Skill, source, or audit noise. Research tasks show natural progress and collapse to source/artifact counts after completion.

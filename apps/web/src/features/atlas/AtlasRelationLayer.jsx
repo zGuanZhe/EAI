@@ -30,7 +30,7 @@ export function AtlasRelationLayer({
 
   return (
     <svg
-      className="timeline-edges"
+      className={cx("timeline-edges", selectedId && "has-selection")}
       width={graph.width}
       height={graph.height}
       viewBox={`0 0 ${graph.width} ${graph.height}`}

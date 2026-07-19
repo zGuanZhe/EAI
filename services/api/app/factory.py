@@ -23,7 +23,7 @@ class DesktopSessionMiddleware(BaseHTTPMiddleware):
 
 
 def create_app(*, lifespan: Any = None) -> FastAPI:
-    app = FastAPI(title="EAI Desktop Service", version="1.0.0", lifespan=lifespan)
+    app = FastAPI(title="EAI Desktop Service", version="1.0.1", lifespan=lifespan)
     app.add_middleware(DesktopSessionMiddleware)
     app.add_middleware(
         CORSMiddleware,

@@ -47,7 +47,9 @@ try {
     # Keep this script ASCII-compatible because Windows PowerShell 5.1 may read UTF-8
     # files without a BOM using the active ANSI code page.
     $env:EAI_VNEXT_MOCK_OPENAI_RESPONSE = '{"answer":"Agent Runtime v2 natural response.","claims":[{"text":"Agent Runtime v2 natural response.","source_ids":["source_44a118a6842bef37da27"],"evidence_ids":[],"kind":"fact"}]}'
-    $env:EAI_V2_MOCK_CAPABILITY_DELAY_MS = "350"
+    # Keep the mocked task active long enough for Playwright to exercise the
+    # running-state controls and targeted steer path deterministically.
+    $env:EAI_V2_MOCK_CAPABILITY_DELAY_MS = "1000"
 
     $Backend = Start-Process -FilePath $Python -ArgumentList "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", $ApiPort -WorkingDirectory (Join-Path $Root "services\api") -RedirectStandardOutput (Join-Path $Logs "backend.out.log") -RedirectStandardError (Join-Path $Logs "backend.err.log") -WindowStyle Hidden -PassThru
     $Frontend = Start-Process -FilePath (Get-Command npm.cmd).Source -ArgumentList "--workspace", "@eai/web", "run", "dev", "--", "--host", "127.0.0.1", "--port", $WebPort -WorkingDirectory $Root -RedirectStandardOutput (Join-Path $Logs "web.out.log") -RedirectStandardError (Join-Path $Logs "web.err.log") -WindowStyle Hidden -PassThru

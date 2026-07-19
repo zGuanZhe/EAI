@@ -57,6 +57,8 @@ import { AgentApprovalInspector } from "../features/inspector/AgentApprovalInspe
 import { ConfirmDialog, RightRail } from "../features/inspector/RightRail.jsx";
 import { WorkspaceCreateDialog } from "../features/workspace/WorkspaceCreateDialog.jsx";
 import { useWorkspaceServerState } from "../features/workspace/useWorkspaceServerState.js";
+import { FirstRunWelcome } from "../features/onboarding/FirstRunWelcome.jsx";
+import { OnboardingTour, readOnboardingStatus, writeOnboardingStatus } from "../features/onboarding/OnboardingTour.jsx";
 import { Button, InlineNotice } from "../components/ui/index.jsx";
 import { useNotifications } from "../app/Notifications.jsx";
 import { Sidebar } from "../layout/Sidebar.jsx";
@@ -72,6 +74,7 @@ import "../features/paper/paper.css";
 import "../features/thread/context.css";
 import "../features/inspector/inspector.css";
 import "../features/home/home.css";
+import "../features/onboarding/onboarding.css";
 
 const COMPOSER_COMMANDS = [
   { id: "atlas", label: "切换 Atlas", command: "/atlas", description: "例如 /atlas H", icon: GitBranch },
@@ -91,6 +94,13 @@ const FALLBACK_COLORS = [
   "#0369a1",
   "#4d7c0f"
 ];
+
+function firstQuestionTitle(value) {
+  const firstLine = String(value).split(/\r?\n/).map((line) => line.trim()).find(Boolean) || "新的研究问题";
+  const normalized = firstLine.replace(/\s+/g, " ");
+  const characters = [...normalized];
+  return characters.length <= 48 ? normalized : `${characters.slice(0, 47).join("")}…`;
+}
 
 function cx(...parts) {
   return parts.filter(Boolean).join(" ");
@@ -245,6 +255,9 @@ export function App() {
   const [atlasFocusPaperId, setAtlasFocusPaperId] = useState(null);
   const [bootstrapped, setBootstrapped] = useState(false);
   const [createDialog, setCreateDialog] = useState(null);
+  const [firstTurnPending, setFirstTurnPending] = useState(null);
+  const [firstTurnBusy, setFirstTurnBusy] = useState(false);
+  const [tour, setTour] = useState({ active: false, step: 0, manual: false });
   const researchReadOnly = Boolean(systemInfo?.research_store?.read_only);
   useEffect(() => {
     if (!status || status === "就绪" || status.startsWith("正在")) return;
@@ -259,13 +272,16 @@ export function App() {
     replaceAttachments: replaceTurnAttachments
   } = useTurnAttachments(thread?.id);
   const {
-    flushDraft, clearDraftAfterPersist, draftConflict, loadRemoteDraft, overwriteRemoteDraft
+    flushDraft, clearDraftAfterPersist, draftConflict, loadRemoteDraft, overwriteRemoteDraft, draftReady
   } = useThreadDraft({
     threadId: thread?.id, text: composer, setText: setComposer,
     agentMode, setAgentMode, attachments: turnAttachments,
     replaceAttachments: replaceTurnAttachments, enabled: !researchReadOnly,
   });
   const bootstrapStartedRef = useRef(false);
+  const onboardingInitializedRef = useRef(false);
+  const firstTurnLockRef = useRef(false);
+  const firstTurnLaunchRef = useRef("");
   const threadRequestRef = useRef(0);
   const paperKnowledgeRequestRef = useRef(0);
 
@@ -296,6 +312,21 @@ export function App() {
     setSettingsOpen(true);
   }
 
+  function startTour() {
+    if (thread) {
+      setToolsPage(false);
+      setSurface("home");
+      setRailOpen(false);
+      setContextDrawerOpen(false);
+    }
+    setTour({ active: true, step: 0, manual: true });
+  }
+
+  function closeTour(statusValue) {
+    writeOnboardingStatus(statusValue);
+    setTour((current) => ({ ...current, active: false }));
+  }
+
   const {
     chatError, isRunning, researchTasks, sendThreadChat, steerThreadChat, stopThreadChat,
     retryThreadChat, resolveApproval, undoOperationBatch, steerResearchTask, pauseResearchTask,
@@ -311,6 +342,40 @@ export function App() {
     setRailOpen,
     setStatus
   });
+
+  useEffect(() => {
+    if (!firstTurnPending || thread?.id !== firstTurnPending.threadId || !draftReady) return;
+    if (firstTurnLaunchRef.current === firstTurnPending.threadId) return;
+    firstTurnLaunchRef.current = firstTurnPending.threadId;
+    const launch = async () => {
+      const started = await sendThreadChat(firstTurnPending.text, {
+        surface: "home",
+        turnAttachments: [],
+        interactionMode: firstTurnPending.interactionMode,
+        sourcePolicy: firstTurnPending.sourcePolicy,
+        deliverable: firstTurnPending.deliverable,
+        depth: firstTurnPending.depth
+      });
+      if (started) {
+        setComposer("");
+        setTour((current) => current.active && current.step <= 1 ? { ...current, step: 2 } : current);
+      } else {
+        setComposer(firstTurnPending.text);
+      }
+      setFirstTurnPending(null);
+      setFirstTurnBusy(false);
+      firstTurnLockRef.current = false;
+      firstTurnLaunchRef.current = "";
+    };
+    launch().catch((error) => {
+      setComposer(firstTurnPending.text);
+      setStatus(`首次提问失败：${error.message || error}`);
+      setFirstTurnPending(null);
+      setFirstTurnBusy(false);
+      firstTurnLockRef.current = false;
+      firstTurnLaunchRef.current = "";
+    });
+  }, [draftReady, firstTurnPending, sendThreadChat, thread?.id]);
 
   function inspectAgentApproval(approval) {
     setDetail({ type: "agent_approval", value: approval });
@@ -339,7 +404,7 @@ export function App() {
       } else {
         setThread(null);
         if (projects.length) setActiveProjectId(projects[0].id);
-        setCreateDialog({ kind: projects.length ? "thread" : "project", required: true });
+        setCreateDialog(null);
       }
       setBootstrapped(true);
       setStatus("就绪");
@@ -355,6 +420,13 @@ export function App() {
     setBootstrapped(true);
     setStatus(`加载工作区失败：${bootstrapError.message}`);
   }, [bootstrapError]);
+
+  useEffect(() => {
+    if (!bootstrapped || onboardingInitializedRef.current) return;
+    onboardingInitializedRef.current = true;
+    if (projects.length || threads.length || readOnboardingStatus()?.status) return;
+    setTour({ active: true, step: 0, manual: false });
+  }, [bootstrapped, projects.length, threads.length]);
 
   useEffect(() => {
     const narrow = window.matchMedia("(max-width: 899px)");
@@ -432,6 +504,36 @@ export function App() {
     }
     setStatus(`已新建成果目标：${title}`);
     return created;
+  }
+
+  async function submitFirstQuestion(event) {
+    event.preventDefault();
+    if (researchReadOnly || firstTurnLockRef.current) return;
+    const text = composer.trim();
+    if (!text) return;
+    firstTurnLockRef.current = true;
+    setFirstTurnBusy(true);
+    const currentProject = projects.find((project) => project.id === activeProjectId);
+    const payload = {
+      text,
+      interactionMode: agentMode,
+      sourcePolicy,
+      deliverable: researchDeliverable,
+      depth: researchDepth
+    };
+    try {
+      const created = await createThread({
+        title: firstQuestionTitle(text),
+        goal: text,
+        atlasId: currentProject?.default_atlas_id || atlases[0]?.id || "G"
+      });
+      setFirstTurnPending({ ...payload, threadId: created.id });
+      setStatus("研究问题已建立，正在启动 Main Agent");
+    } catch (error) {
+      firstTurnLockRef.current = false;
+      setFirstTurnBusy(false);
+      setStatus(`创建研究问题失败：${error.message || error}`);
+    }
   }
 
   function switchProject(projectId) {
@@ -905,8 +1007,7 @@ export function App() {
         body: JSON.stringify({
           template_id: selectedTemplateId,
           focused_object: focusedObjectForTaskPack(),
-          selected_only: true,
-          provider: "openai"
+          selected_only: true
         })
       });
       setResultPreview(preview);
@@ -1490,23 +1591,44 @@ export function App() {
 
   if (!thread) {
     return (
-      <div className="empty-workspace-shell">
-        <header className="empty-workspace-header">
-          <strong>EAI Desktop</strong>
-          <Button compact onClick={openSettings}><KeyRound size={15} />模型设置</Button>
-        </header>
-        <main className="empty-workspace-main">
-          <span className="empty-workspace-icon"><MessageSquarePlus size={22} /></span>
-          <h1>{bootstrapped ? "还没有研究问题" : "正在加载工作区"}</h1>
-          {bootstrapped && <p>可以直接创建一个未归档问题，或先定义成果目标。</p>}
-          {bootstrapped && (
-            <div className="empty-workspace-actions">
-              <Button variant="primary" onClick={() => setCreateDialog({ kind: "thread", required: false })}><MessageSquarePlus size={16} />新建研究问题</Button>
-              <Button onClick={() => setCreateDialog({ kind: "project", required: false })}><FolderPlus size={16} />新建成果目标</Button>
-            </div>
+      <>
+        <FirstRunWelcome
+          configured={Boolean(secrets?.configured)}
+          projectTitle={projects.find((project) => project.id === activeProjectId)?.title || ""}
+          status={status}
+          onPrompt={(text) => {
+            setComposer(text);
+            setStatus("示例问题已放入输入框，可以继续修改。");
+          }}
+          onSettings={openSettings}
+          onHelp={startTour}
+          onCreateThread={() => setCreateDialog({ kind: "thread", required: false })}
+          onCreateProject={() => setCreateDialog({ kind: "project", required: false })}
+          composer={(
+            <Composer
+              value={composer}
+              setValue={setComposer}
+              onSubmit={submitFirstQuestion}
+              toolOpen={false}
+              setToolOpen={() => {}}
+              onOpenContext={() => {}}
+              isHome
+              commands={[]}
+              onRunCommand={() => {}}
+              interactionMode={agentMode}
+              onInteractionModeChange={setAgentMode}
+              sourcePolicy={sourcePolicy}
+              onSourcePolicyChange={setSourcePolicy}
+              researchDeliverable={researchDeliverable}
+              onResearchDeliverableChange={setResearchDeliverable}
+              researchDepth={researchDepth}
+              onResearchDepthChange={setResearchDepth}
+              readOnly={researchReadOnly}
+              bootstrapMode
+              submitBusy={firstTurnBusy}
+            />
           )}
-          {status && <span className="empty-workspace-status" role="status">{status}</span>}
-        </main>
+        />
         {createDialogElement}
         <DesktopSettings
           open={settingsOpen}
@@ -1515,7 +1637,16 @@ export function App() {
           secrets={secrets}
           onRuntimeRestarted={refreshRuntimeState}
         />
-      </div>
+        <OnboardingTour
+          active={tour.active}
+          step={tour.step}
+          workspaceReady={false}
+          manual={tour.manual}
+          onStep={(step) => setTour((current) => ({ ...current, step }))}
+          onSkip={() => closeTour("skipped")}
+          onComplete={() => closeTour("completed")}
+        />
+      </>
     );
   }
 
@@ -1543,6 +1674,7 @@ export function App() {
           setSurface("atlas");
           setRailOpen(false);
         }}
+        onHelp={startTour}
         onSettings={openSettings}
         activeAtlas={thread.active_atlas_id}
         activeSurface={toolsPage ? "tools" : surface}
@@ -1875,6 +2007,15 @@ export function App() {
         onApplyCandidate={applyAtlasCandidate}
         onAskMainAgent={askMainAgentAboutPaper}
         onRetainPaper={retainPaperForThread}
+      />
+      <OnboardingTour
+        active={tour.active}
+        step={tour.step}
+        workspaceReady
+        manual={tour.manual}
+        onStep={(step) => setTour((current) => ({ ...current, step }))}
+        onSkip={() => closeTour("skipped")}
+        onComplete={() => closeTour("completed")}
       />
     </div>
   );

@@ -66,7 +66,7 @@ EAI Desktop 是面向个人研究者的本地优先科研工作台。它解决�
 | `external_only` | 允许 | 禁止 | 允许 |
 | `local_and_external` | 允许 | 允许 | 允许 |
 
-显式策略高于路由、模式和模型决策。未知策略返回 `422`，并且不会产生网络请求。OpenAI-compatible 模型端点只提供模型推理；EAI 不假设它自带网页搜索。
+显式策略高于路由、模式和模型决策。未知策略返回 `422`，并且不会产生网络请求。模型端点只提供模型推理；EAI 不假设它自带网页搜索。设置页可直接选择 OpenAI、自定义兼容、OpenRouter、Anthropic、Gemini、DeepSeek、Qwen、xAI、Groq、SiliconFlow、Kimi、Ollama 或 LM Studio；Anthropic 使用原生 Messages，其余预设使用兼容的 Responses 或 Chat Completions。模型 ID 与请求地址仍可编辑。
 
 SourcePolicy 位于 Composer 的独立来源控件中，默认值是 `local_and_external`（界面显示“全部可用来源”）。发送前摘要与运行审计都会显示实际策略、已使用来源和不可用连接器。
 

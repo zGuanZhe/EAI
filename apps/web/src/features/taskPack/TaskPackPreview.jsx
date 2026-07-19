@@ -1,7 +1,9 @@
 import { Clipboard, Send } from "lucide-react";
 
 export function TaskPackPreview({ preview, selected, onPreview, onCopy, onRun, secrets }) {
-  const hasOpenAI = Boolean(secrets?.providers?.some((item) => item === "openai" || item.provider === "openai"));
+  const hasModelProvider = Boolean(secrets?.configured || secrets?.providers?.some((item) => (
+    typeof item === "string" ? Boolean(item) : item?.configured !== false
+  )));
   if (!preview) {
     return (
       <section className="task-pack-preview-panel">
@@ -25,7 +27,7 @@ export function TaskPackPreview({ preview, selected, onPreview, onCopy, onRun, s
       <pre>{preview.markdown?.slice(0, 1200)}</pre>
       <div className="task-pack-actions">
         <button className="primary-button wide" onClick={onCopy}><Clipboard size={15} /> 复制 Task Pack</button>
-        <button className="ghost-button wide soft" disabled={!hasOpenAI} onClick={onRun}><Send size={15} /> 发送 API</button>
+        <button className="ghost-button wide soft" disabled={!hasModelProvider} onClick={onRun}><Send size={15} /> 发送 API</button>
       </div>
     </section>
   );

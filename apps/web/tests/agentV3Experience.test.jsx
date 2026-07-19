@@ -33,7 +33,8 @@ describe("Agent v3 interaction lanes", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "研究任务" }));
-    await user.selectOptions(screen.getByRole("combobox", { name: "来源范围" }), "external_only");
+    await user.click(screen.getByRole("combobox", { name: "来源范围" }));
+    await user.click(screen.getByRole("option", { name: "仅外部" }));
     expect(changeLane).toHaveBeenCalledWith("research");
     expect(changePolicy).toHaveBeenCalledWith("external_only");
   });

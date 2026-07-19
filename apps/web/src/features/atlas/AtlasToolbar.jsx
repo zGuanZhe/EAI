@@ -1,5 +1,6 @@
 import { ChevronDown, RefreshCcw, Search, SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
+import { Select } from "../../components/ui/index.jsx";
 
 export function AtlasToolbar({
   query,
@@ -32,14 +33,8 @@ export function AtlasToolbar({
           <SlidersHorizontal size={14} />筛选<ChevronDown size={13} />
         </button>
         <div className={`atlas-filter-fields${filtersOpen ? " open" : ""}`}>
-          <select value={routeFilter} onChange={(event) => onRouteFilter(event.target.value)} aria-label="筛选路线">
-            <option value="all">全部路线</option>
-            {routes.map((route, index) => <option key={route.id} value={route.id}>{routeLabel(route, index)}</option>)}
-          </select>
-          <select value={yearFilter} onChange={(event) => onYearFilter(event.target.value)} aria-label="筛选年份">
-            <option value="all">全部年份</option>
-            {years.map((year) => <option key={year} value={year}>{year}</option>)}
-          </select>
+          <Select value={routeFilter} options={[{ value: "all", label: "全部路线" }, ...routes.map((route, index) => ({ value: route.id, label: routeLabel(route, index) }))]} onChange={onRouteFilter} ariaLabel="筛选路线" compact tone="cyan" />
+          <Select value={yearFilter} options={[{ value: "all", label: "全部年份" }, ...years.map((year) => ({ value: year, label: String(year) }))]} onChange={onYearFilter} ariaLabel="筛选年份" compact tone="cyan" />
           <button className="atlas-update-entry" type="button" onClick={onOpenUpdate}><RefreshCcw size={14} />论文更新</button>
         </div>
       </div>

@@ -68,7 +68,7 @@ const packageVersion = JSON.parse(read("package.json")).version;
 const webVersion = JSON.parse(read("apps/web/package.json")).version;
 const tauriVersion = JSON.parse(read("apps/desktop/src-tauri/tauri.conf.json")).version;
 const cargoVersion = read("apps/desktop/src-tauri/Cargo.toml").match(/^version\s*=\s*"([^"]+)"/m)?.[1];
-if (new Set([packageVersion, webVersion, tauriVersion, cargoVersion]).size !== 1 || packageVersion !== "1.0.0") {
+if (new Set([packageVersion, webVersion, tauriVersion, cargoVersion]).size !== 1 || packageVersion !== "1.0.1") {
   failures.push(`version mismatch: package=${packageVersion}, web=${webVersion}, tauri=${tauriVersion}, cargo=${cargoVersion}`);
 }
 

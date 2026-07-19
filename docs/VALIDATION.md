@@ -1,4 +1,4 @@
-# EAI Desktop 1.0 Validation
+# EAI Desktop 1.0.1 Validation
 
 ## Per-Checkpoint Gates
 
@@ -15,22 +15,23 @@ Run Campaign Docker smoke when Campaign/Docker changes, sidecar gates when its d
 ## Current Results
 
 - Repository bootstrap: passed with clean npm dependencies and repository-local Python environment.
-- Frontend Vitest: 26 tests passed, including axe, Agent v3 dual-lane controls, Atlas query race coverage, dismissible first-run creation and desktop Provider/web-search configuration.
+- Frontend Vitest: 40 tests passed across 13 files, including axe, Agent v3 dual-lane controls, Atlas query race coverage, first-send creation/retry guards, versioned onboarding, portal Listbox keyboard behavior, desktop Provider/web-search configuration and provider-neutral Task Pack availability.
 - Frontend production build: passed.
-- Service unittest: 102 tests passed, including Agent v3 AskTurn/ResearchTask isolation, 240+ bilingual retrieval-routing cases, ContextManifest, web URL hardening, SourcePolicy, Evidence Guard, SSE replay, runtime schema 2 recovery, Research Store schema 4/outbox, PDF limits, Campaign, legacy read/410 boundaries, drafts, OperationBatch and ChangeSet undo.
+- Service unittest: 108 tests passed, including Agent v3 AskTurn/ResearchTask isolation, 240+ bilingual retrieval-routing cases, native Anthropic text/stream/tool mapping with prompt caching, Provider precedence, fail-closed explicit selection and audit identity, ContextManifest, web URL hardening, SourcePolicy, Evidence Guard, SSE replay, runtime schema 2 recovery, Research Store schema 4/outbox, PDF limits, Campaign, legacy read/410 boundaries, drafts, OperationBatch and ChangeSet undo.
 - Canonical transaction fault coverage passed: multi-record failure rolls back every canonical row and journal entry; expected-payload conflict writes nothing; JSON projection failure preserves the SQLite commit and replayable journal; a runtime receipt failure after commit reconciles without applying OperationBatch twice.
 - Application composition coverage passed: an immutable `ApplicationConfig` creates an isolated application/data root and `application.py` has zero route decorators. The legacy contract remains 107 paths/116 operations with path-method hash `e6395d9c1486b2a37d4ed6c04c84a38ac61656a3a59e202cb540dda23730144e`; the complete v1 contract is 122 paths/132 operations with version-neutral hash `1c4e552e0ba33a094e722c8c75bca9f1503a97f027600b0c487cf91e773e1dba`.
-- Playwright: passed with the isolated empty seed at `1440x900`, `1180x820`, and `760x900`; narrow main width was 696px.
+- Playwright: passed with isolated data at `760`, `900`, `1119`, `1120`, `1180`, and `1440px` widths, plus a 200% effective-zoom first-run viewport and reduced-motion context. The welcome Composer, explicit creation dialogs, settings, all portal Listboxes, Atlas focus/zoom/pan, drawers and narrow layouts remained usable without horizontal overflow; narrow main width was 696px.
 - Campaign Docker fixture: passed in Docker with the expected fixture metric; no host fallback ran.
 - Sidecar: rebuilt from the new workspace with Python 3.14.4; random-port authentication and Tauri CORS smoke passed.
-- Rust: fmt passed, Clippy passed with `-D warnings`, and 5 tests passed, including loopback/HTTPS Provider URL validation and backward-compatible web-search settings.
-- The 1.0.0 PyInstaller sidecar, Tauri release and NSIS package built successfully. Isolated install/start/normal-close/uninstall smoke passed with real AppData unchanged. Installer size is 75,909,325 bytes and SHA-256 is `7B88CDD85518872FFF9197190E59E91BFFF9953A13D239D9C8B0B6FFED80D61E`.
+- Rust: fmt passed, Clippy passed with `-D warnings`, and 7 tests passed, including the Provider catalog, native Anthropic format boundary, loopback keyless boundary, loopback/HTTPS URL validation and backward-compatible web-search settings.
+- The 1.0.1 PyInstaller sidecar, Tauri release and NSIS package built successfully. Isolated install/start/normal-close/uninstall smoke passed with real AppData unchanged. The release installer is 77,584,376 bytes with SHA-256 `479824B3FE6A40F75D375AE78C9B4B1181A0B4C8501B6A0D145E774F5828FD9D`.
+- The release installer was applied in place to `D:\Test\EAI Desktop`; a path/length/SHA-256 manifest of all 147 files below real `%APPDATA%\com.eai.desktop` was identical before and after installation.
 
 ## Installed-App Acceptance
 
 The smoke script silently installs NSIS to a temporary directory, launches with test-only AppData, waits for the sidecar readiness file, closes the application, verifies no new sidecar process remains, silently uninstalls, and compares a SHA-256 manifest of real `%APPDATA%\com.eai.desktop` before and after.
 
-## v1.0 Release Contract
+## v1.0.1 Release Contract
 
 - Freeze the legacy 107-path/116-operation path-method hash separately from the complete v1 OpenAPI contract. Freeze Agent v3 ResearchTask SSE order, monotonic seq, reconnect and terminal deduplication independently.
 - Validate runtime schema 1 -> 2 paired backups, failure restoration and whole-application read-only startup for higher research or runtime schema.

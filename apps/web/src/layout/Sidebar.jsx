@@ -3,6 +3,7 @@ import {
   Brain,
   CheckCircle2,
   ChevronDown,
+  CircleHelp,
   CircleDot,
   Clock3,
   Folder,
@@ -41,6 +42,7 @@ export function Sidebar({
   onHome,
   onTools,
   onSettings,
+  onHelp,
   onSwitchSurface,
   activeAtlas,
   activeSurface,
@@ -83,7 +85,7 @@ export function Sidebar({
   ];
 
   return (
-    <aside className={cx("sidebar", collapsed && "collapsed")}>
+    <aside className={cx("sidebar", collapsed && "collapsed")} data-onboarding="navigation">
       <div className="brand-row">
         <button
           className="sidebar-brand-glyph"
@@ -245,7 +247,8 @@ export function Sidebar({
 
       <div className="sidebar-footer">
         <button className={cx(activeSurface === "tools" && "active")} type="button" onClick={onTools}><Clock3 size={18} /> <span>运行中心</span></button>
-        <button type="button" onClick={onSettings}><KeyRound size={18} /> <span>设置</span></button>
+        <button type="button" onClick={onHelp}><CircleHelp size={18} /> <span>使用指南</span></button>
+        <button type="button" onClick={onSettings} data-onboarding="setup"><KeyRound size={18} /> <span>设置</span></button>
       </div>
     </aside>
   );

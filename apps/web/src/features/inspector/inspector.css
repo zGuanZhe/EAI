@@ -6,9 +6,10 @@
 .canvas-node-inspector { display: grid; align-content: start; gap: 12px; }
 .canvas-node-inspector > label { display: grid; gap: 5px; }
 .canvas-node-inspector > label > span, .canvas-node-fields label > span { color: var(--muted); font-size: 10px; font-weight: 700; }
-.canvas-node-inspector input, .canvas-node-inspector textarea, .canvas-node-inspector select { width: 100%; border: 0; border-bottom: 1px solid var(--line-strong); outline: 0; padding: 8px 2px; background: transparent; color: var(--ink); }
+.canvas-node-inspector input, .canvas-node-inspector textarea { width: 100%; border: 0; border-bottom: 1px solid var(--line-strong); outline: 0; padding: 8px 2px; background: transparent; color: var(--ink); }
+.canvas-node-inspector .ui-select { width: 100%; }
 .canvas-node-inspector textarea { min-height: 100px; resize: vertical; line-height: 1.55; }
-.canvas-node-inspector input:focus, .canvas-node-inspector textarea:focus, .canvas-node-inspector select:focus { border-bottom-color: var(--violet); }
+.canvas-node-inspector input:focus, .canvas-node-inspector textarea:focus { border-bottom-color: var(--violet); }
 .canvas-node-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .canvas-node-fields label { display: grid; gap: 5px; }
 .changeset-operations { gap: 0; }

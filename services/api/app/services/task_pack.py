@@ -297,9 +297,8 @@ class TaskPackService:
     def run_task_pack(self, thread_id: str, payload: TaskPackRunRequest) -> TaskPackRunResponse:
         thread = self._load(thread_id)
         preview = self.build_task_pack(thread, payload)
-        provider = payload.provider or "openai"
-        if provider != "openai": raise TaskPackError(400, "第一版仅支持 OpenAI provider。")
         raw_text, used_model = self.provider.run_task_pack(preview.markdown, payload.model)
+        provider = self.provider.configured_provider() or payload.provider or "openai"
         result_preview = self.preview_result(thread_id, ResultPreviewRequest(raw_text=raw_text))
         tool_run = ToolRun(
             id=new_id("tool"), tool="research_template_run", status="preview",

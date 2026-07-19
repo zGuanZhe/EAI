@@ -356,17 +356,14 @@
   background: rgba(17, 136, 102, 0.07);
 }
 
-.composer-source-select select {
-  max-width: 88px;
+.composer-source-select .ui-select { width: 104px; }
+.composer-source-select .ui-select > button {
   min-height: 28px;
-  padding: 0 2px;
   border: 0;
-  outline: 0;
+  padding: 0 2px;
   background: transparent;
   color: inherit;
-  cursor: pointer;
-  font: inherit;
-  font-size: 11px;
+  font-size: var(--font-meta);
 }
 
 .composer-lane-switch button:focus-visible,
@@ -455,7 +452,7 @@
   gap: 4px;
 }
 
-.composer-research-brief select {
+.composer-research-brief .ui-select > button {
   min-height: 26px;
   padding: 0 5px;
   border: 0;
@@ -464,6 +461,7 @@
   color: #46515b;
   font: inherit;
 }
+.composer-research-brief .ui-select { min-width: 88px; }
 
 @media (max-width: 760px) {
   .agent-thread-surface {

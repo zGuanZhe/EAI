@@ -12,7 +12,7 @@
 .canvas-add-menu > div button:hover { background: var(--violet-soft); }
 .canvas-link-mode { position: sticky; z-index: 5; top: 0; display: flex; align-items: center; gap: 9px; max-width: 920px; margin: 12px auto 0; padding: 9px 12px; border-radius: 8px; background: var(--violet-soft); color: var(--violet); }
 .canvas-link-mode span { flex: 1; font-size: 12px; font-weight: 700; }
-.canvas-link-mode select, .canvas-link-mode button { min-height: 30px; border: 0; border-radius: 7px; background: #fff; color: var(--ink); }
+.canvas-link-mode .ui-select > button, .canvas-link-mode > button { min-height: 30px; border: 0; border-radius: 7px; background: #fff; color: var(--ink); }
 .canvas-link-mode button { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
 .argument-flow { position: relative; width: min(920px, calc(100% - 48px)); margin: 0 auto; padding: 24px 0 80px; }
 .argument-node-row { --node-color: var(--blue); --node-soft: var(--blue-soft); position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; margin-left: calc(var(--depth) * 32px); padding: 0 0 18px 36px; }
@@ -53,7 +53,8 @@
 .campaign-header h2 { margin: 3px 0 0; font-size: 21px; line-height: 1.35; }
 .campaign-header p { max-width: 72ch; margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
 .campaign-header-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 7px; }
-.campaign-header-actions select { max-width: 220px; min-height: 34px; border: 0; border-radius: 9px; padding: 0 28px 0 10px; background: var(--panel-soft); color: var(--ink); }
+.campaign-header-actions .ui-select { width: min(220px, 100%); }
+.campaign-header-actions .ui-select > button { min-height: 34px; border: 0; border-radius: 8px; background: var(--panel-soft); }
 .campaign-next-action { display: grid; grid-template-columns: 132px minmax(0, 1fr) auto; align-items: center; gap: 20px; padding: 14px 24px; background: var(--violet-soft); border-bottom: 1px solid var(--line); }
 .campaign-next-action > div:first-child { display: grid; gap: 2px; }
 .campaign-next-action > div:first-child span { color: var(--violet); font-size: 10px; font-weight: 750; }
@@ -110,7 +111,7 @@
 .campaign-idea-sources strong { color: var(--green); }
 .campaign-idea-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding-top: 14px; color: var(--muted); font-size: 11px; }
 .campaign-idea-footer label { display: flex; align-items: center; gap: 7px; }
-.campaign-idea-footer select, .campaign-idea-footer input { min-height: 32px; border: 0; border-radius: 8px; padding-inline: 9px; outline: 0; background: var(--panel-soft); color: var(--ink); }
+.campaign-idea-footer .ui-select > button, .campaign-idea-footer input { min-height: 32px; border: 0; border-radius: 8px; padding-inline: 9px; outline: 0; background: var(--panel-soft); color: var(--ink); }
 .campaign-seed-path { flex: 1; min-width: 280px; }
 .campaign-seed-path input { flex: 1; }
 
@@ -188,7 +189,7 @@
   .campaign-workspace.inspector-open { padding-right: 0; }
   .campaign-header { display: grid; padding-inline: 16px; }
   .campaign-header-actions { justify-content: flex-start; }
-  .campaign-header-actions select { max-width: 100%; }
+  .campaign-header-actions .ui-select { max-width: 100%; }
   .campaign-next-action { grid-template-columns: minmax(0, 1fr) auto; padding-inline: 16px; }
   .campaign-next-action > div:first-child { grid-column: 1 / -1; }
   .campaign-stage-disclosure > summary { margin-left: 16px; }

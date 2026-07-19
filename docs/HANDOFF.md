@@ -1,4 +1,4 @@
-# EAI Desktop 1.0 Development Handoff
+# EAI Desktop 1.0.1 Development Handoff
 
 ## Start Here
 
@@ -10,6 +10,7 @@ This repository is the complete active workspace and has no dependency on former
 - Informational asks search every allowed available source; greetings and text transformations do not search. Generic web search is independent from the OpenAI-compatible model channel and supports SearXNG, Brave and Tavily.
 - ResearchTask persists ContextManifest and checkpoint history, supports targeted steer/pause/resume/cancel, keeps the Composer available, and promotes to Campaign only through an explicit command.
 - Runtime schema 2 adds `context_manifests`, `research_checkpoints`, and `ui_commands`. A higher research or runtime schema forces the whole application into structured read-only mode.
+- The model channel supports native Anthropic Messages and editable OpenAI-compatible presets for OpenAI, OpenRouter, Gemini, DeepSeek, Qwen, xAI, Groq, SiliconFlow, Kimi, Ollama and LM Studio. Loopback endpoints may be keyless; remote endpoints remain HTTPS-and-key only.
 
 - Agent v3 is the user-facing entry over the audited v2 runtime engine. New turns use the conditional `decide -> capability -> observe` loop, steer, attempts, replayable SSE, Evidence Guard, approvals and OperationBatch.
 - Plain conversation uses zero capabilities and zero sources. Research context starts small and expands through registered capabilities.
@@ -20,7 +21,7 @@ This repository is the complete active workspace and has no dependency on former
 - Schema 4 is active. SQLite is canonical; JSON is an outbox-driven compatibility projection with pending/failed replay, not part of a cross-medium transaction.
 - v1.0 is the first supported public desktop release. Downgrade to experimental 0.x builds is unsupported; users should retain an AppData backup before changing major versions. Higher research/runtime schemas still force structured read-only mode.
 
-## Structural Changes Through 1.0
+## Structural Changes Through 1.0.1
 
 - `apps/web/src/App.jsx` is only the application entry; workspace and extracted Atlas/Inspector features live in dedicated modules.
 - Obsolete v1 execution hooks were removed. Historical `AgentRunTrace` remains display-only.
@@ -29,7 +30,8 @@ This repository is the complete active workspace and has no dependency on former
 - Architecture checks prevent old workspace paths, hot-path regressions, and version drift.
 - Desktop AppData can be overridden only in explicit test mode, enabling isolated install smoke without touching real user data.
 - Desktop settings persist the selected Provider, Base URL, model and API format as non-secret AppData configuration while API keys remain in Windows Credential Manager. Only the selected Provider is injected into the sidecar; remote endpoints require HTTPS and loopback endpoints may use HTTP.
-- First-run workspace creation is dismissible by close, Cancel, backdrop and Escape. An empty workspace remains usable and exposes model settings plus direct project/thread creation instead of trapping the user in a required modal.
+- A fresh empty workspace now opens on a welcome Composer with example questions and model readiness. The first send creates one research thread under the selected project or Unfiled Work and then launches the selected AskTurn/ResearchTask; explicit project/thread dialogs remain available but are never startup gates.
+- Versioned local-only onboarding provides four non-modal, skippable and replayable steps across model readiness, first input, lane/source controls and workspace navigation. The shared portal Listbox replaces every native web select while preserving values, form semantics and accessible names.
 - Workspace server state now uses React Query keys; thread detail remains local because SSE patches it incrementally. Atlas switching, knowledge polling and runtime refresh no longer use request counters or ad hoc timers.
 - Workspace, Draft, System, Atlas/Object Memory and Agent v2/source/document APIs use explicit router/service boundaries. Agent API orchestration and its shared thread lock are lifespan-owned. Architecture checks validate dependency direction and registered routers rather than treating file size as the primary metric.
 - Change review, thread content, Task Pack and legacy read/replay APIs now use explicit router/service boundaries. Legacy Agent v1 mutations terminate at the frozen `410 Gone` router; their unreachable execution, Provider loop and Lab/Task Pack construction code has been removed.
@@ -45,16 +47,16 @@ Completed in the new workspace:
 
 - clean `npm ci` and repository-local Python bootstrap
 - UTF-8/architecture checks
-- 26-test frontend Vitest suite and production build
-- 102-test FastAPI suite, including Agent v3 dual-lane routing, Research Store, Campaign, synthetic legacy fixtures, canonical batch rollback, projection failure, runtime receipt reconciliation and `410` compatibility
+- 40-test frontend Vitest suite and production build, including first-send failure/retry guards, onboarding state, shared Listbox interaction, Provider settings and provider-neutral Task Pack availability
+- 108-test FastAPI suite, including Agent v3 dual-lane routing, Research Store, Campaign, native Anthropic mapping, Provider precedence and fail-closed selection, synthetic legacy fixtures, canonical batch rollback, projection failure, runtime receipt reconciliation and `410` compatibility
 - isolated Playwright coverage at desktop, medium and narrow widths
 - Campaign Docker fixture, with execution isolated in Docker and no host fallback
 - freshly built PyInstaller sidecar smoke on a random port
-- Rust fmt, Clippy with warnings denied, and five desktop data-path/provider-config tests
-- 1.0.0 PyInstaller, Tauri release and NSIS isolated install/start/close/uninstall smoke
+- Rust fmt, Clippy with warnings denied, and seven desktop data-path/provider-config tests
+- 1.0.1 PyInstaller, Tauri release and NSIS isolated install/start/close/uninstall smoke
 - real `%APPDATA%\com.eai.desktop` SHA-256 tree unchanged before and after installed-app smoke
 
-The source and installed-app gates for v1.0 are recorded in `docs/VALIDATION.md`. The final installer passed isolated install/start/normal-close/uninstall smoke. Real Provider acceptance is environment-dependent and is not represented by offline fixtures.
+The source and installed-app gates for v1.0.1 are recorded in `docs/VALIDATION.md`. The final installer passed isolated install/start/normal-close/uninstall smoke and was installed to `D:\Test\EAI Desktop` with all 147 real AppData files unchanged. Real Provider acceptance is environment-dependent and is not represented by offline fixtures.
 
 ## Known Constraints
 

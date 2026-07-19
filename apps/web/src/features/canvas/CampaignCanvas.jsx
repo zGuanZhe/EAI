@@ -4,7 +4,7 @@ import {
   FileArchive, FileText, FlaskConical, GitBranch, GitCompare, MessageSquareText,
   PackageOpen, Play, Search, ShieldCheck, Sparkles, Square, X
 } from "lucide-react";
-import { Button, Drawer, EmptyState, InlineNotice, SegmentedControl, StatusDot, cx } from "../../components/ui/index.jsx";
+import { Button, Drawer, EmptyState, InlineNotice, SegmentedControl, Select, StatusDot, cx } from "../../components/ui/index.jsx";
 import { useMediaQuery } from "../../app/useMediaQuery.js";
 import { buildCampaignTree, CAMPAIGN_STAGE_LABELS, getCampaignNextStep } from "./model.js";
 
@@ -39,9 +39,9 @@ function IdeaPreview({ preview, busy, runtimeStatus, executionProfile, onExecuti
         ))}
       </div>
       <footer className="campaign-idea-footer">
-        <label>实验起点<select value={seedKind} onChange={(event) => setSeedKind(event.target.value)}><option value="blank">空白隔离脚手架</option><option value="local_snapshot">本地代码只读快照</option></select></label>
+        <label>实验起点<Select value={seedKind} options={[{ value: "blank", label: "空白隔离脚手架" }, { value: "local_snapshot", label: "本地代码只读快照" }]} onChange={setSeedKind} ariaLabel="实验起点" tone="violet" /></label>
         {seedKind === "local_snapshot" && <label className="campaign-seed-path">本地目录<input value={seedPath} onChange={(event) => setSeedPath(event.target.value)} placeholder="D:\research\my-project" /></label>}
-        <label>执行环境<select value={executionProfile} onChange={(event) => onExecutionProfile(event.target.value)}><option value="cpu">CPU</option>{runtimeStatus.cuda_available && <option value="cuda">CUDA</option>}</select></label>
+        <label>执行环境<Select value={executionProfile} options={[{ value: "cpu", label: "CPU" }, ...(runtimeStatus.cuda_available ? [{ value: "cuda", label: "CUDA" }] : [])]} onChange={onExecutionProfile} ariaLabel="执行环境" tone="violet" /></label>
       </footer>
     </div>
   );
@@ -195,7 +195,7 @@ export function CampaignCanvas({ controller, sourceNode, onAskMainAgent }) {
     if (step.action === "open_artifacts") setView("artifacts");
   };
   return <div className={cx("campaign-workspace", controller.selectedBranchId && "inspector-open")}>
-    <header className="campaign-header"><div><span>{campaign.source_kind === "legacy_lab" ? "历史 Campaign" : "AI Scientist v2 Campaign"}</span><h2>{campaign.title}</h2><p>{campaign.hypothesis}</p></div><div className="campaign-header-actions"><select value={campaign.id} onChange={(event) => controller.setActiveCampaignId(event.target.value)}>{controller.campaigns.map((item) => <option value={item.campaign.id} key={item.campaign.id}>{item.campaign.title}</option>)}</select>{campaign.status === "running" && <Button variant="secondary" onClick={() => controller.campaignAction(campaign.id, "pause")}><CirclePause size={14} />暂停</Button>}{["running", "waiting_approval", "paused"].includes(campaign.status) && <Button variant="quiet" onClick={() => controller.campaignAction(campaign.id, "cancel")}><Square size={13} />停止</Button>}</div></header>
+    <header className="campaign-header"><div><span>{campaign.source_kind === "legacy_lab" ? "历史 Campaign" : "AI Scientist v2 Campaign"}</span><h2>{campaign.title}</h2><p>{campaign.hypothesis}</p></div><div className="campaign-header-actions"><Select value={campaign.id} options={controller.campaigns.map((item) => ({ value: item.campaign.id, label: item.campaign.title }))} onChange={controller.setActiveCampaignId} ariaLabel="当前 Campaign" compact tone="violet" />{campaign.status === "running" && <Button variant="secondary" onClick={() => controller.campaignAction(campaign.id, "pause")}><CirclePause size={14} />暂停</Button>}{["running", "waiting_approval", "paused"].includes(campaign.status) && <Button variant="quiet" onClick={() => controller.campaignAction(campaign.id, "cancel")}><Square size={13} />停止</Button>}</div></header>
     <CampaignNextAction value={nextStep} busy={controller.busy} onAction={runNextStep} />
     <details className="campaign-stage-disclosure">
       <summary>查看完整阶段路径</summary>

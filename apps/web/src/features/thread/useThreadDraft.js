@@ -22,6 +22,7 @@ function interactionMode(value) {
 
 export function useThreadDraft({ threadId, text, setText, agentMode, setAgentMode, attachments, replaceAttachments, enabled = true }) {
   const [conflict, setConflict] = useState(null);
+  const [readyThreadId, setReadyThreadId] = useState("");
   const revisionRef = useRef(0);
   const loadedThreadRef = useRef("");
   const clearedAfterSendRef = useRef(false);
@@ -32,6 +33,7 @@ export function useThreadDraft({ threadId, text, setText, agentMode, setAgentMod
     if (!threadId || !enabled) return undefined;
     let active = true;
     loadedThreadRef.current = "";
+    setReadyThreadId("");
     revisionRef.current = 0;
     setText("");
     setAgentMode("ask");
@@ -45,9 +47,14 @@ export function useThreadDraft({ threadId, text, setText, agentMode, setAgentMod
         replaceAttachments((draft.attachment_refs || []).map(restoredAttachment));
       }
       loadedThreadRef.current = threadId;
+      setReadyThreadId(threadId);
       clearedAfterSendRef.current = false;
       setConflict(null);
-    }).catch(() => { if (active) loadedThreadRef.current = threadId; });
+    }).catch(() => {
+      if (!active) return;
+      loadedThreadRef.current = threadId;
+      setReadyThreadId(threadId);
+    });
     return () => { active = false; };
   }, [enabled, replaceAttachments, setAgentMode, setText, threadId]);
 
@@ -121,6 +128,6 @@ export function useThreadDraft({ threadId, text, setText, agentMode, setAgentMod
 
   return {
     flushDraft: flush, clearDraftAfterPersist: clearAfterPersist, draftConflict: conflict,
-    loadRemoteDraft, overwriteRemoteDraft,
+    loadRemoteDraft, overwriteRemoteDraft, draftReady: !threadId || readyThreadId === threadId,
   };
 }

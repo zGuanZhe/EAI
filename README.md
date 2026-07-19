@@ -9,7 +9,7 @@
 [![License](https://img.shields.io/badge/License-MIT-2F855A?style=flat-square)](LICENSE)
 ![Architecture](https://img.shields.io/badge/Agent-v3-6B5DD3?style=flat-square)
 
-[下载 v1.0](https://github.com/zGuanZhe/EAI/releases/latest) · [产品介绍](docs/INTRODUCTION.md) · [系统架构](docs/ARCHITECTURE.md) · [发布说明](docs/RELEASE_NOTES_1.0.0.md)
+[下载 v1.0.1](https://github.com/zGuanZhe/EAI/releases/latest) · [产品介绍](docs/INTRODUCTION.md) · [系统架构](docs/ARCHITECTURE.md) · [发布说明](docs/RELEASE_NOTES_1.0.1.md)
 
 </div>
 
@@ -59,17 +59,17 @@ flowchart TB
 
 ## 下载与安装
 
-下载 [**EAI-Desktop_1.0.0_x64-setup.exe**](https://github.com/zGuanZhe/EAI/releases/download/v1.0.0/EAI-Desktop_1.0.0_x64-setup.exe)，支持 Windows 10/11 x64。
+下载 [**EAI-Desktop_1.0.1_x64-setup.exe**](https://github.com/zGuanZhe/EAI/releases/download/v1.0.1/EAI-Desktop_1.0.1_x64-setup.exe)，支持 Windows 10/11 x64。
 
 ```text
-SHA-256  7B88CDD85518872FFF9197190E59E91BFFF9953A13D239D9C8B0B6FFED80D61E
-大小      75,909,325 bytes
+SHA-256  479824B3FE6A40F75D375AE78C9B4B1181A0B4C8501B6A0D145E774F5828FD9D
+大小      77,584,376 bytes
 ```
 
 安装包当前未代码签名，Windows 可能显示 SmartScreen 提示。只应从 `github.com/zGuanZhe/EAI` 的正式 Release 下载。
 
 ```powershell
-Get-FileHash -Algorithm SHA256 '.\EAI-Desktop_1.0.0_x64-setup.exe'
+Get-FileHash -Algorithm SHA256 '.\EAI-Desktop_1.0.1_x64-setup.exe'
 ```
 
 > [!NOTE]
@@ -81,8 +81,8 @@ Get-FileHash -Algorithm SHA256 '.\EAI-Desktop_1.0.0_x64-setup.exe'
 
 | 配置 | 支持范围 | 密钥位置 |
 |---|---|---|
-| 模型 Provider | OpenAI-compatible、OpenRouter；Chat Completions 或 Responses API | Windows Credential Manager |
-| 本机中转 | `http://127.0.0.1:PORT/v1`；HTTP 只允许 loopback | Windows Credential Manager |
+| 模型 Provider | OpenAI、自定义兼容、OpenRouter、Anthropic、Gemini、DeepSeek、Qwen、xAI、Groq、SiliconFlow、Kimi | Windows Credential Manager |
+| 本机模型 | Ollama、LM Studio 及其他 OpenAI-compatible loopback；可不设 Key | Windows Credential Manager（如使用 Key） |
 | 通用网页搜索 | SearXNG、Brave Search、Tavily | SearXNG 可无 Key；其他 Key 存 Credential Manager |
 | 学术连接器 | OpenAlex、arXiv、Crossref，可选 Semantic Scholar | 按连接器配置 |
 
@@ -96,7 +96,7 @@ Composer 的来源控件决定本轮 SourcePolicy，默认是“全部可用来�
 
 1. 从左侧导航打开“设置”。
 2. 在“模型 Provider”中填写 Base URL、模型名称、API 格式和 Key。
-3. 普通 `/chat/completions` 中转选择 Chat Completions；实现 `/responses` 的端点选择 Responses API。OpenRouter 预设使用 Chat Completions。
+3. Anthropic 预设使用原生 Messages API；其他预设使用 Chat Completions 或 Responses API。模型 ID 和 Base URL 始终可编辑，因此也可连接未列入预设的兼容服务。
 4. 保存后，桌面端会重启 sidecar 并重新获取运行时状态。发送一个简单询问验证模型连接。
 5. `401/403` 通常表示 Key 或上游权限错误；`404` 通常表示 Base URL/API 格式不匹配；模型不存在错误应检查模型名称。
 6. 如需通用网页搜索，在“网页搜索”中选择 SearXNG、Brave 或 Tavily，然后点击“检查连接”。

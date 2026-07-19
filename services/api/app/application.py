@@ -50,7 +50,7 @@ from .research.router import create_research_router
 from .research.store import ResearchStore
 from .schemas.models import AtlasUpdateDoc, ObjectMemory, ProjectDoc, ThreadDoc
 
-SERVICE_VERSION = "1.0.0"
+SERVICE_VERSION = "1.0.1"
 DEFAULT_ROOT = Path(__file__).resolve().parents[3]
 CONFIG = ApplicationConfig.load(DEFAULT_ROOT, service_version=SERVICE_VERSION)
 RUNTIME_PATHS = CONFIG.paths

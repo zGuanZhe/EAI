@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, FlaskConical, Link2, Plus, Sparkles, X } from "lucide-react";
 import { canvasReadiness } from "../../state/researchFlow.js";
-import { Button, EmptyState, SegmentedControl, SurfaceHeader, cx } from "../../components/ui/index.jsx";
+import { Button, EmptyState, SegmentedControl, Select, SurfaceHeader, cx } from "../../components/ui/index.jsx";
 import { buildArgumentFlow, EDGE_LABELS, NODE_LABELS, normalizeEdgeLabel, TASK_STATUS_LABELS } from "./model.js";
 import { CampaignCanvas } from "./CampaignCanvas.jsx";
 import { useCampaigns } from "./useCampaigns.js";
@@ -145,7 +145,7 @@ export function ContextCanvas({ thread, onDetail, onSave, onAskAgent, onThreadCh
         <div className="canvas-link-mode">
           <Link2 size={14} />
           <span>选择目标节点</span>
-          <select value={edgeLabel} onChange={(event) => setEdgeLabel(event.target.value)}>{Object.entries(EDGE_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select>
+          <Select value={edgeLabel} options={Object.entries(EDGE_LABELS).map(([value, label]) => ({ value, label }))} onChange={setEdgeLabel} ariaLabel="关系类型" compact tone="violet" />
           <button type="button" onClick={() => setEdgeSourceId(null)}><X size={14} />取消</button>
         </div>
       )}
